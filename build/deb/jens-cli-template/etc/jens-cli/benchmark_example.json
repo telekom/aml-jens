@@ -1,0 +1,43 @@
+ {
+  "Hash":"8e9f46a8b3d55f5cad5b0eb3d3197c10",
+  "Inner":{
+    "Name":"Example Benchmark [A]",
+    "MaxBitrateEstimationTimeS":5,
+    "Patterns":[
+      {
+        "Path": "/etc/jens-cli/drp_bratislava.csv",
+        "Hash": "f474cc6ae000b73f467852b8207cfba1",
+        "Setting": {
+          "DRP":{
+            "Scale": 0.1
+          }
+        }
+      },{
+        "Path": "/etc/jens-cli/drp_3valleys.csv",
+        "Hash": "020b6fc00d7a6f91c050a0833f11c18d"
+      },{
+        "Path": "/etc/jens-cli/drp_munich_autobahn.csv",
+        "Hash": "f1649856b1191bf3e824d9eba687e3c2",
+        "Setting": {
+          "DRP":{
+            "Scale": 0.4
+          }
+        }
+      }
+    ],
+    "DrplaySetting":{
+      "DRP":{
+        "Frequency": 10,
+        "Scale": 1.0,
+        "MinRateKbits": 1000,
+        "WarmupBeforeDrpMs": 2000
+      },
+      "TC": {
+        "Markfree": 4,
+        "Markfull": 14,
+        "Queuesizepackets": 10000,
+        "Extralatency": 20
+      }
+    }
+  }
+}
