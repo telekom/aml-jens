@@ -1,58 +1,30 @@
-.PHONY: all test clean clean-go-testdata
+TEST_DATA_DIR="./test/testdata"
+VERSION ?= "00.00-99"
+all: help
 
-BUILD_DIR = "build"
-DEB_DIR = "build/deb"
-DEB_PACKAGE = "jens-cli"
-VERSION ?="99.99"
-
-default: clean-local-logs test go-build-dev
-
-deb-package: clean go-build-release
-	@echo building package
-	./$(DEB_DIR)/create-deb-files.sh $(VERSION)
-
-clean: clean-deb-packages clean-local-logs clean-go-testdata
-	@echo Removing executables
-	@rm -f "$(BUILD_DIR)/drplay" "$(BUILD_DIR)/drshow"
-	@rm -f "$(BUILD_DIR)/drbenchmark" "$(BUILD_DIR)/drbcreate"
-	
-
-go-build-dev: 
+build-binaries: # Build executables under cmd/*
+build-binaries: clean-binaries
 	@echo Building executables
-	@go build -ldflags "-s" -o $(BUILD_DIR) ./cmd/*
-	@chmod +x ./cmd/dr*
-	@echo Done
-
-go-build-release:
-	@echo Building executables
-	@go build -o $(BUILD_DIR) ./cmd/*
-	@chmod +x ./cmd/dr*
-
-test: | go-test clean-go-testdata
-
-go-test: go-pre-test
-	@echo Testing
+	@go build -v -o ./bin/ ./cmd/*
+	@chmod +x ./bin/*
+clean-binaries:
+	@rm -rf ./bin/*
+clean-packages:
+	@rm -rf ./out/*
+test: # Run go tests
+test: pre-test
 	@go test ./...
-	
+pre-test:
+	@cp -rf ${TEST_DATA_DIR} cmd/drbenchmark/internal
+	@cp -rf ${TEST_DATA_DIR} internal/persistence/datatypes
 
-go-pre-test:
-	@cp -rf testdata drbenchmark
-	@cp -rf testdata cmd/drplay
-	@cp -rf testdata drcommon/persistence/jsonp
-	@cp -rf testdata drcommon/persistence/datatypes
+package: # Create a (.deb) package containing all executabels
+package: test build-binaries
+	@mkdir -p out 
+	@cd deployments/debian && VERSION=$(VERSION) $(MAKE) build
+	@echo Removing artifacts
+	@cd deployments/debian && VERSION=$(VERSION) $(MAKE) clean
 
-clean-go-testdata:
-	@echo Removing Testdata
-	@rm -rf drbenchmark/testdata
-	@rm -rf testdata cmd/drplay
-	@rm -rf drcommon/persistence/jsonp/testdata
-	@rm -rf drcommon/persistence/datatypes/testdata
-
-
-clean-deb-packages:
-	@echo Removing debian-packages
-	@rm -rf $(DEB_DIR)/$(DEB_PACKAGE)-[0-9]*
-
-clean-local-logs:
-	@rm -rf dr.log
-	@rm -f /etc/jens-cli/dr.log
+help: # Display this help
+	@echo 'Help:'
+	@cat makefile | grep ': \#' | grep --invert-match column | sed "s/^/  /" | column -s"\#" -t

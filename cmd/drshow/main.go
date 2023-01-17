@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -24,14 +24,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"jens/drcommon/assets"
-	"jens/drcommon/logging"
-	"jens/drcommon/updater"
-	"jens/drshow/modes/file"
-	"jens/drshow/modes/folder"
-	pipe "jens/drshow/modes/pipe"
 	"os"
 	"strings"
+
+	"github.com/telekom/aml-jens/cmd/drshow/internal/modes/file"
+	"github.com/telekom/aml-jens/cmd/drshow/internal/modes/folder"
+	"github.com/telekom/aml-jens/cmd/drshow/internal/modes/pipe"
+	"github.com/telekom/aml-jens/internal/assets"
+	"github.com/telekom/aml-jens/internal/logging"
 )
 
 type mode uint8
@@ -97,7 +97,6 @@ func main() {
 		printHelp(path)
 	}
 
-	updater.DisplayUpdateMsgIfNewerVersion()
 }
 
 func isDirectory(path string) bool {
