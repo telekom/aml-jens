@@ -1,4 +1,4 @@
-module jens
+module github.com/telekom/aml-jens
 
 go 1.18
 

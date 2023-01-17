@@ -1,0 +1,1 @@
+complete -f -o plusdirs -X '!*.@(csv)' drshow

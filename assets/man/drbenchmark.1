@@ -1,0 +1,50 @@
+.\" Manpage for JENS-CLI.
+.\" Contact EDGE-Computing@telekom.de to correct errors or typos.
+.TH JENS-CLI(1) "04 November 2022" "1.0" "EDGE-Computing@telekom.de" "jens-cli documentation"
+
+
+.SH NAME
+drbenchmark 
+
+.SH PACKAGE
+Part of JENS-CLI.
+
+.SH SYNOPSIS
+\fBdrbenchmark\fP [ \-dev \fInic\fP \-benchmark \fIbenchmark.json\fP \-tag \fIalgo:L4S:true\fP ]
+
+
+.SH DESCRIPTION
+The JENS-CLI contains a data rate player i.e. drplay. 
+Measures of the used l4s queue are collected.
+\fIdrbenchmark\fP is used to repeatedly run drplay according to a set configuration (JSON).
+A connection to the psql db is needed.
+
+.SH OPTIONS
+  -dev \fIstring\fP
+      NetworkInterfaceCard (nic) to play data rate pattern on, default 'lo' (default "lo")
+  -benchmark \fIstring\fP
+      JSON file. The configuration of the benchmark
+  -tag \fIstring\fP
+      tag or human readable name of this benchmark. Used in db.
+
+.SH FILES
+  /etc/jens-cli/config.toml
+      Config file with defaults for each Session of the Benchmark.
+      Used as a foallback for not defined arguments in the json.
+  /etc/jens-cli/benchmark_example.json
+      Default Benchmarkdefinition in JSON format.
+      Highlight all settings
+  /etc/jens-cli/logs/DrBenchmark.log
+      Log file
+
+.SH BUGS
+No known bugs.
+
+.SH NOTES
+Contact EDGE-Computing@telekom.de in case of errors or typos.
+
+.SH AUTHOR
+EDGE-Computing (EDGE-Computing@telekom.de)
+
+.SH SEE ALSO
+.Xr drbenchmark(1)

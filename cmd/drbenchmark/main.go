@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -25,19 +25,20 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"jens/drbenchmark"
-	"jens/drcommon/assets"
-	"jens/drcommon/config"
-	"jens/drcommon/errortypes"
-	"jens/drcommon/logging"
-	"jens/drcommon/persistence"
-	"jens/drcommon/persistence/datatypes"
-	"jens/drcommon/persistence/jsonp"
-	"jens/drcommon/persistence/psql"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	drbenchmark "github.com/telekom/aml-jens/cmd/drbenchmark/internal"
+	"github.com/telekom/aml-jens/internal/assets"
+	"github.com/telekom/aml-jens/internal/config"
+	"github.com/telekom/aml-jens/internal/errortypes"
+	"github.com/telekom/aml-jens/internal/logging"
+	"github.com/telekom/aml-jens/internal/persistence"
+	"github.com/telekom/aml-jens/internal/persistence/datatypes"
+	"github.com/telekom/aml-jens/internal/persistence/jsonp"
+	"github.com/telekom/aml-jens/internal/persistence/psql"
 )
 
 var DEBUG, INFO, FATAL = logging.GetLogger()
