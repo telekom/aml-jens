@@ -1,0 +1,79 @@
+_dr_lsinterfaces()
+{
+    local cmd PATH=$PATH:/sbin
+
+    if [[ ${1:-} == -w ]]; then
+        cmd="iwconfig"
+    elif [[ ${1:-} == -a ]]; then
+        cmd="{ ifconfig || ip link show up; }"
+    else
+        cmd="{ ifconfig -a || ip link show; }"
+    fi
+
+    COMPREPLY=( $( eval $cmd 2>/dev/null | awk \
+        '/^[^ \t]/ { if ($1 ~ /^[0-9]+:/) { print $2 } else { print $1 } }' ) )
+    COMPREPLY=( $( compgen -W '${COMPREPLY[@]/%[[:punct:]]/}' -S ' ' -- "$cur" ) )
+}
+_drplay()
+{
+    local cur prev words cword opts final
+    local IFS=$'\t\n'
+    _init_completion -n = || return
+
+    opts="-dev$IFS-pattern$IFS-freq$IFS-csv$IFS-psql$IFS-loop$IFS-tag$IFS-scale$IFS-nomeasure"
+    # Remove already used opts
+    blacklist=()
+    options=($opts)
+    for item in "${COMP_WORDS[@]:1}"; do
+        case $item in 
+        -dev)
+            blacklist+=(-dev)
+        ;;
+        -freq)
+            blacklist+=(-freq)
+        ;;
+        -scale)
+            blacklist+=(-scale)
+        ;;
+        -pattern)
+            blacklist+=(-pattern)
+        ;;
+        *)
+        # Only add typed item into blacklist if its a valid op
+        if [ ${#item} -ge 2 ]; then
+            for i in "${!options[@]}"; do
+                if [[ ${options[i]} = $item ]]; then blacklist+=( $item); fi
+            done
+        fi
+        ;;
+        esac
+    done
+    # Update the options by removing blacklisted items
+    # NOTE the / will remove prefixes!
+    for item in "${blacklist[@]}"; do
+        opts=("${opts[@]/$item}")
+    done
+
+    # Show context senitive opts
+    case $prev in
+    -dev)
+	    _dr_lsinterfaces -a
+
+    ;;
+    -freq)
+        COMPREPLY="100 "
+    ;;
+    -scale)
+        COMPREPLY="0.1 "
+    ;;
+    -pattern)
+	    COMPREPLY=( $(compgen -f -X '!*.csv' -S ' ' -- ${cur}) )
+        COMPREPLY+=( $(compgen -d -S '/' -- ${cur}) )
+    ;;
+    *)
+        COMPREPLY=( $(compgen -W "${opts}" -S ' ' -- ${cur}) )
+    ;;
+    esac
+}
+
+complete -o nospace -F  _drplay drplay
