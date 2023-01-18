@@ -25,9 +25,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/telekom/aml-jens/cmd/drshow/internal/data/acquisition"
 	"github.com/telekom/aml-jens/cmd/drshow/internal/data/channel"
 	"github.com/telekom/aml-jens/cmd/drshow/internal/modes"
+	"github.com/telekom/aml-jens/pkg/drp"
 
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/container"
@@ -41,7 +41,7 @@ const rootID = "root"
 var ErrorOrNil error = nil
 
 func Run(path string) error {
-	drpList, err := acquisition.NewDrpListFromFolder(path)
+	drpList, err := drp.NewDrpListFromFolder(path)
 	if err != nil {
 		return err
 	}

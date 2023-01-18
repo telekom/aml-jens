@@ -25,8 +25,8 @@ import (
 	"context"
 
 	"github.com/telekom/aml-jens/cmd/drshow/internal/data/channel"
-	"github.com/telekom/aml-jens/cmd/drshow/internal/data/drpdata"
 	"github.com/telekom/aml-jens/internal/util"
+	data "github.com/telekom/aml-jens/pkg/drp"
 
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/widgets/linechart"
@@ -60,7 +60,7 @@ func NewPatternLineChart(ctx context.Context, updater *channel.DrpChannels) (*li
 	}()
 	return chart, nil
 }
-func NewStaticPatternLineChart(ctx context.Context, drp *drpdata.DrpT) (*linechart.LineChart, error) {
+func NewStaticPatternLineChart(ctx context.Context, drp *data.DataRatePattern) (*linechart.LineChart, error) {
 	chart, err := linechart.New(
 		linechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),
 		linechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),
