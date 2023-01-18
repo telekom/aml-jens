@@ -22,29 +22,29 @@
 package channel
 
 import (
-	data "github.com/telekom/aml-jens/cmd/drshow/internal/data/drpdata"
+	data "github.com/telekom/aml-jens/pkg/drp"
 )
 
 type DrpChannels struct {
-	UpdateDrpPattern chan data.DrpT
-	UpdateDrpDetails chan data.DrpT
+	UpdateDrpPattern chan data.DataRatePattern
+	UpdateDrpDetails chan data.DataRatePattern
 	UpdateDrpList    chan data.DrpListT
 }
 
 func NewStaticDrpChannels() *DrpChannels {
 	return &DrpChannels{
-		UpdateDrpDetails: make(chan data.DrpT),
+		UpdateDrpDetails: make(chan data.DataRatePattern),
 		UpdateDrpList:    make(chan data.DrpListT),
 	}
 }
 func NewDrpChannels() *DrpChannels {
 	return &DrpChannels{
-		UpdateDrpPattern: make(chan data.DrpT),
-		UpdateDrpDetails: make(chan data.DrpT),
+		UpdateDrpPattern: make(chan data.DataRatePattern),
+		UpdateDrpDetails: make(chan data.DataRatePattern),
 		UpdateDrpList:    make(chan data.DrpListT),
 	}
 }
-func (s *DrpChannels) UpdateDrpGlobally(drp data.DrpT) {
+func (s *DrpChannels) UpdateDrpGlobally(drp data.DataRatePattern) {
 	s.UpdateDrpDetails <- drp
 	if s.UpdateDrpPattern != nil {
 		s.UpdateDrpPattern <- drp
