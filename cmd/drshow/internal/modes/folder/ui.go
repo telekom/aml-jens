@@ -26,10 +26,9 @@ import (
 	"errors"
 
 	"github.com/telekom/aml-jens/cmd/drshow/internal/data/channel"
-	"github.com/telekom/aml-jens/cmd/drshow/internal/data/drpdata"
-	dm "github.com/telekom/aml-jens/cmd/drshow/internal/data/drpdata"
 	drpWidgets "github.com/telekom/aml-jens/cmd/drshow/internal/data/widgets/drp"
 	"github.com/telekom/aml-jens/cmd/drshow/internal/data/widgets/shared"
+	"github.com/telekom/aml-jens/pkg/drp"
 
 	"github.com/mum4k/termdash/container"
 	"github.com/mum4k/termdash/container/grid"
@@ -46,7 +45,7 @@ type wids struct {
 	infoBox   *text.Text
 }
 
-func NewUI(ctx context.Context, t terminalapi.Terminal, c *container.Container, updater *channel.DrpChannels, patterns *drpdata.DrpListT) (*wids, error) {
+func NewUI(ctx context.Context, t terminalapi.Terminal, c *container.Container, updater *channel.DrpChannels, patterns *drp.DrpListT) (*wids, error) {
 	txt, err := drpWidgets.NewDrpDetailsTextBox(ctx, t, updater)
 	if err != nil {
 		return nil, err
@@ -82,7 +81,7 @@ func NewUI(ctx context.Context, t terminalapi.Terminal, c *container.Container, 
 		infoBox:   info,
 	}, nil
 }
-func (s *wids) Layout(patterns *dm.DrpListT) ([]container.Option, error) {
+func (s *wids) Layout(patterns *drp.DrpListT) ([]container.Option, error) {
 	builder := grid.New()
 	builder.Add(
 		grid.ColWidthFixed(30,
