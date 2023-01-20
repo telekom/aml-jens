@@ -46,7 +46,7 @@ func NewDrpDetailsTextBox(ctx context.Context, t terminalapi.Terminal, chans *ch
 			select {
 			case drp := <-chans.UpdateDrpDetails:
 				wrapped.Reset()
-				err := wrapped.Write(fmt.Sprintf("Pattern: %s\nSamples: %d\nMinimum: %s\nMaximum: %s\nAverage: %s\nPath:    %s", drp.Name, drp.SampleCount(), util.FormatLabelISOKilo(drp.Min), util.FormatLabelISOKilo(drp.Max), util.FormatLabelISOKilo(drp.Avg), drp.Filepath))
+				err := wrapped.Write(fmt.Sprintf("Pattern: %s\nSamples: %d\nMinimum: %s\nMaximum: %s\nAverage: %s\nPath:    %s", drp.Name, drp.SampleCount(), util.FormatLabelISOKilo(drp.Min), util.FormatLabelISOKilo(drp.Max), util.FormatLabelISOKilo(drp.Avg), drp.Origin))
 				if err != nil {
 					panic(err)
 

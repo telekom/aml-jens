@@ -32,6 +32,7 @@ import (
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
 	"github.com/telekom/aml-jens/internal/persistence/mock"
 	"github.com/telekom/aml-jens/internal/persistence/psql"
+	"github.com/telekom/aml-jens/pkg/drp"
 	drplay "github.com/telekom/aml-jens/pkg/drp_player"
 )
 
@@ -39,6 +40,7 @@ var DEBUG, INFO, FATAL = logging.GetLogger()
 
 func ArgParse() (err error) {
 	result := config.PlayCfg().A_Session
+	var looping bool
 	// parse parameters
 	flag.StringVar(
 		&(result.Dev),
@@ -63,7 +65,7 @@ func ArgParse() (err error) {
 		time.Now().Format("2006.01.02 15:04:05"),
 		"tag of this measure session")
 	flag.BoolVar(
-		&result.ChildDRP.Loop,
+		&looping,
 		"loop",
 		false,
 		"defines if data rate pattern player should run in an endless loop")
@@ -105,8 +107,9 @@ func ArgParse() (err error) {
 			return err
 		}
 	}
-
-	return result.ChildDRP.ParseDrpFile(*pattern_path)
+	err = result.ChildDRP.ParseDRP(drp.NewDataRatePatternFileProvider(*pattern_path))
+	result.ChildDRP.SetLooping(looping)
+	return err
 }
 
 func main() {

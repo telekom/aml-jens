@@ -48,5 +48,6 @@ func TESTDATA() string {
 }
 func TESTDATA_DRP() string {
 	t := TESTDATA()
+	print(t)
 	return filepath.Join(t, "drp/")
 }

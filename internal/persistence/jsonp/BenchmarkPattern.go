@@ -29,6 +29,7 @@ import (
 
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
 	"github.com/telekom/aml-jens/internal/util"
+	"github.com/telekom/aml-jens/pkg/drp"
 )
 
 type BenchmarkPattern struct {
@@ -58,9 +59,8 @@ func (bp *BenchmarkPattern) loadPattern() error {
 	bp.pattern = &datatypes.DB_data_rate_pattern{
 		MinRateKbits: 0.9652,
 		Scale:        0.9999965,
-		Loop:         false,
 	}
-	return bp.pattern.ParseDrpFile(bp.Path)
+	return bp.pattern.ParseDRP(drp.NewDataRatePatternFileProvider(bp.Path))
 }
 
 func (bp *BenchmarkPattern) GetHashOfLoadedPattern() []byte {

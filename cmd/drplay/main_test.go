@@ -24,6 +24,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func preTest(t *testing.T, args []string) func() {
 	}
 }
 func TestArgParse(t *testing.T) {
-	viper.GetViper().AddConfigPath("../../test/testdata/config/")
+	viper.GetViper().AddConfigPath(filepath.Join("../../test/testdata/", "config"))
 	//Sadly only able to test all, due to flag package
 	//not having a reset function
 	possibleArgs := [][]string{
@@ -50,7 +51,7 @@ func TestArgParse(t *testing.T) {
 		{"-loop"},
 		{"-freq", "36"},
 		{"-dev", "eno1"},
-		{"-pattern", "/tmp/drp_3valleys.csv"},
+		{"-pattern", filepath.Join("../../test/testdata/drp", "drp_3valleys.csv")},
 		//{"-psql"},
 		{"-scale", "0.36"},
 		{"-tag", "aTestTag36"},
@@ -74,7 +75,10 @@ func TestArgParse(t *testing.T) {
 			Time:     uint64(time.Now().UnixMilli()),
 			ChildDRP: &datatypes.DB_data_rate_pattern{},
 		}
-		ArgParse()
+		err := ArgParse()
+		if err != nil {
+			t.Fatal(err)
+		}
 		validate(t, tests, config.PlayCfg().A_Session, post)
 		post()
 	}
@@ -92,7 +96,7 @@ func validate(t *testing.T, set []int, sess *datatypes.DB_session, cleanup func(
 			t.Fatalf(caseB, 0, "-csv")
 		}
 	}
-	if !sess.ChildDRP.Loop {
+	if !sess.ChildDRP.IsLooping() {
 		if contains(set, 1) {
 			cleanup()
 			t.Fatalf(caseA, 1, "-loop")
@@ -124,13 +128,13 @@ func validate(t *testing.T, set []int, sess *datatypes.DB_session, cleanup func(
 
 	}
 
-	if sess.ChildDRP.Name != "drp_3valleys.csv" {
+	if sess.ChildDRP.GetName() != "drp_3valleys.csv" {
 		if contains(set, 4) {
 			cleanup()
 			t.Fatalf(caseA, 4, "-pattern='/tmp/drp_3valleys.csv'")
 		} else {
 			cleanup()
-			t.Fatalf(caseB, 4, fmt.Sprintf("-pattern='%s'", sess.ChildDRP.Name))
+			t.Fatalf(caseB, 4, fmt.Sprintf("-pattern='%s'", sess.ChildDRP.GetName()))
 		}
 
 	}
