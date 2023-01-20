@@ -23,6 +23,7 @@ package drp
 
 import (
 	"github.com/telekom/aml-jens/internal/errortypes"
+	"github.com/telekom/aml-jens/internal/util"
 )
 
 type DataRatePatternIterator struct {
@@ -30,42 +31,64 @@ type DataRatePatternIterator struct {
 	looping  bool
 	operator int
 	data     *[]float64
+	i        int
+	value    float64
 }
 
-func NewDataRatePatternIterator(drp *DataRatePattern) *DataRatePatternIterator {
+func NewDataRatePatternIterator() *DataRatePatternIterator {
 	return &DataRatePatternIterator{
-		position: -1,
+		position: 0,
 		looping:  false,
 		operator: +1,
-		data:     drp.data,
+		i:        -1,
 	}
+}
+func (s *DataRatePatternIterator) UpdateAndReset(drp *[]float64) {
+	s.data = drp
+	s.i = -1
+	s.value = (*drp)[0]
 }
 func (s *DataRatePatternIterator) Value() float64 {
-	if s.position < 0 {
-		//TODO: Evaluate occurings
-		INFO.Println("Tried to Value() @ -1")
-		return (*s.data)[0]
-	}
-	return (*s.data)[s.position-s.operator]
+	return s.value
 }
 func (s *DataRatePatternIterator) Next() (float64, error) {
-	last_pos := s.position
-	if s.position >= len(*s.data) {
-		if s.looping {
-			s.operator = -1
-			last_pos -= 1
-			s.position -= 1
-		} else {
-			return -1, &errortypes.IterableStopError{Msg: "end of DRP"}
+	switch max_i := len(*s.data); {
+	case s.i == -1:
+		s.i += s.operator * 2
+		break
+	case s.i >= max_i || s.i <= 0:
+		at_max := s.i >= max_i
+		//We are at the end of a cycle
+		if !s.looping {
+			return 0, &errortypes.IterableStopError{}
 		}
-	} else {
-		s.operator = +1
-		last_pos += 1
-		s.position += 1
+		//reverse driection
+		s.operator *= -1
+		if at_max {
+			//double last value and continue at last -1
+			s.i += s.operator * 2
+		} else /* at_min*/ {
+			//start back up at 0- doubling it
+			s.i = -1
+			s.value = (*s.data)[0]
+		}
+
+	default:
+		s.i += s.operator
+		index := util.MinInt(max_i-1, util.AbsInt(s.i-s.operator))
+		s.value = (*s.data)[index]
 	}
-	s.position += int(s.operator)
-	return (*s.data)[last_pos], nil
+	return s.value, nil
 }
 func (s *DataRatePatternIterator) SetLooping(endless bool) {
 	s.looping = endless
+}
+func (s *DataRatePatternIterator) IsLooping() bool {
+	return s.looping
+}
+
+func (s *DataRatePatternIterator) SetDone() {
+	s.SetLooping(false)
+	s.operator = +1
+	s.position = len(*s.data)
 }

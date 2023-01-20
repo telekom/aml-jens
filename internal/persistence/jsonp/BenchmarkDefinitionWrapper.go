@@ -33,6 +33,7 @@ import (
 	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
 	"github.com/telekom/aml-jens/internal/util"
+	"github.com/telekom/aml-jens/pkg/drp"
 )
 
 var DEBUG, INFO, FATAL = logging.GetLogger()
@@ -169,15 +170,14 @@ func LoadDB_benchmarkFromJson(path string) (*datatypes.DB_benchmark, error) {
 
 	for i, v := range defintion.Patterns {
 		s, f, m, w := ReadDrpValuesWithFallbacks(play_cfg.A_Session.ChildDRP, v.Setting.DRP, defintion.DrplaySetting.DRP)
-		drp := datatypes.NewDB_data_rate_pattern()
-		drp.Loop = false
-		drp.Freq = f
-		drp.Scale = s
-		drp.MinRateKbits = m
-		drp.Drp_sha256 = v.pattern.GetHash()
-		drp.WarmupTimeMs = w
+		db_drp := datatypes.NewDB_data_rate_pattern()
+		db_drp.SetLooping(false)
+		db_drp.Freq = f
+		db_drp.Scale = s
+		db_drp.MinRateKbits = m
+		db_drp.WarmupTimeMs = w
 
-		drp.ParseDrpFile(v.Path)
+		db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(v.Path))
 		fe, fu, el, l4, ss, qs := ReadTcValuesWithFallbacks(play_cfg.A_Session, v.Setting.TC, defintion.DrplaySetting.TC)
 		benchmark.Sessions[i] = &datatypes.DB_session{
 			Markfree:            fe,
@@ -186,7 +186,7 @@ func LoadDB_benchmarkFromJson(path string) (*datatypes.DB_benchmark, error) {
 			L4sEnablePreMarking: l4,
 			SignalDrpStart:      ss,
 			Dev:                 config.BenchmarkCfg().A_Dev,
-			ChildDRP:            drp,
+			ChildDRP:            db_drp,
 			Name:                fmt.Sprintf("%s:%s (%d/%d)", benchmark.Name, benchmark.Tag, i+1, len(benchmark.Sessions)),
 			Queuesizepackets:    qs,
 		}

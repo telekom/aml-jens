@@ -41,7 +41,7 @@ func TestConvertDRPdata_OK_saw(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := convertDRPdata(strdata)
+	data, err := convertDRPdata(strdata, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,6 +87,7 @@ func TestConvertDRPdata_OK_saw(t *testing.T) {
 }
 
 func Validate3Valleys_Stats(t *testing.T, data DataRatePattern) {
+	t.Helper()
 	if data.Length != 3000 {
 		t.Fatal("Incorrect amount of entries loaded")
 	}
@@ -103,7 +104,7 @@ func Validate3Valleys_Stats(t *testing.T, data DataRatePattern) {
 
 func TestDataRatePatternFileProvider_OK_3valleys(t *testing.T) {
 	var path = filepath.Join(paths.TESTDATA_DRP(), "drp_3valleys.csv")
-	data, err := NewDataRatePatternFileProvider(path).Provide()
+	data, err := NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +112,7 @@ func TestDataRatePatternFileProvider_OK_3valleys(t *testing.T) {
 }
 func TestDataRatePatternFileProvider_OK_3valleys_generic_comment(t *testing.T) {
 	var path = filepath.Join(paths.TESTDATA_DRP(), "drp_3valleys_generic_comment.csv")
-	data, err := NewDataRatePatternFileProvider(path).Provide()
+	data, err := NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +134,7 @@ I expect this to also count as a comment
 
 func TestDataRatePatternFileProvider_OK_3valleys_kv_comment(t *testing.T) {
 	var path = filepath.Join(paths.TESTDATA_DRP(), "drp_3valleys_kv_comment.csv")
-	data, err := NewDataRatePatternFileProvider(path).Provide()
+	data, err := NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
