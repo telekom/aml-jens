@@ -251,8 +251,8 @@ func TestReadBenchmarkFromFile(t *testing.T) {
 	}
 	bm.Tag = "TESTING"
 	for i, v := range bm.Sessions {
-		if v.ChildDRP.Name != DRP_NAME {
-			t.Fatalf("Name for pattern %d is read incorrectly. (is: %s, should be %s)", i, v.ChildDRP.Name, DRP_NAME)
+		if v.ChildDRP.GetName() != DRP_NAME {
+			t.Fatalf("Name for pattern %d is read incorrectly. (is: %s, should be %s)", i, v.ChildDRP.GetName(), DRP_NAME)
 		}
 	}
 	expectations := [][3]interface{}{

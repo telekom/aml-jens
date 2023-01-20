@@ -33,7 +33,7 @@ type DataRatePattern struct {
 	iter            *DataRatePatternIterator
 	Name            string
 	data            *[]float64
-	Filepath        string
+	Origin          string
 	Description     string
 	Mapping         map[string]string
 	Min             float64
@@ -48,17 +48,22 @@ type DataRatePattern struct {
 	Th_link_usage   string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
 }
 
-func NewDataRatePattern(filepath string, min float64, max float64, avg float64) *DataRatePattern {
-	filenameS := strings.Split(filepath, "/")
+func NewDataRatePattern(origin string) *DataRatePattern {
+	filenameS := strings.Split(origin, "/")
 	filename := strings.Split(filenameS[len(filenameS)-1], ".")
 
 	return &DataRatePattern{
-		Name:     strings.Join(filename[:len(filename)-1], ""),
-		Filepath: filepath,
-		Min:      min,
-		Max:      max,
-		Avg:      avg,
-		iter:     nil,
+		Name:            strings.Join(filename[:len(filename)-1], ""),
+		Origin:          origin,
+		Min:             0,
+		Max:             0,
+		Avg:             0,
+		iter:            nil,
+		Th_mq_latency:   "{2,4}",
+		Th_p95_latency:  "{10,20}",
+		Th_p99_latency:  "{10,20}",
+		Th_p999_latency: "{10,20}",
+		Th_link_usage:   "{60,80}",
 	}
 }
 func (s *DataRatePattern) SampleCount() int {
@@ -68,6 +73,7 @@ func (s *DataRatePattern) SetData(d []float64) {
 	cpy := make([]float64, len(d))
 	copy(cpy, d)
 	s.data = &cpy
+	s.iter.UpdateAndReset(s.data)
 }
 func (s *DataRatePattern) GetData() *[]float64 {
 	return s.data
@@ -84,7 +90,10 @@ func (s *DataRatePattern) GetStats() (min float64, max float64, avg float64) {
 
 func (s *DataRatePattern) Iterator() *DataRatePatternIterator {
 	if s.iter == nil {
-		s.iter = NewDataRatePatternIterator(s)
+		s.iter = NewDataRatePatternIterator()
+		if s.data != nil && len(*s.data) != 0 {
+			s.iter.UpdateAndReset(s.data)
+		}
 	}
 	return s.iter
 }

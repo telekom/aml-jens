@@ -29,6 +29,7 @@ import (
 
 	"github.com/telekom/aml-jens/internal/assets/paths"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
+	"github.com/telekom/aml-jens/pkg/drp"
 )
 
 func getDrps(t *testing.T, path string) []string {
@@ -68,19 +69,18 @@ func TestStdDrp(t *testing.T) {
 		t.Fatal("No std DRPs found.")
 	}
 	for _, v := range drps {
-		drp := datatypes.DB_data_rate_pattern{
+		db_drp := datatypes.DB_data_rate_pattern{
 			Scale: 1,
-			Loop:  false,
 		}
-		err := drp.ParseDrpFile(filepath.Join(paths.TESTDATA_DRP(), v))
+		err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), v)))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err != nil {
 			t.Fatalf("Loaded std drp, got an error: %s", err)
 		}
-		if drp.GetHashStr() != hashes[v] {
-			t.Logf("Got: %s != %s", drp.GetHashStr(), hashes[v])
+		if db_drp.GetHashStr() != hashes[v] {
+			t.Logf("Got: %s != %s", db_drp.GetHashStr(), hashes[v])
 			t.Fatalf("Pattern %s seems to have changed", v)
 		}
 	}

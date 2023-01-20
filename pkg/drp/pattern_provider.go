@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -42,7 +43,7 @@ import (
 var DEBUG, INFO, FATAL = logging.GetLogger()
 
 type DataRatePatternProvider interface {
-	Provide() DataRatePattern
+	Provide(scale float64, minrate float64) (DataRatePattern, error)
 }
 
 type DataRatePatternFileProvider struct {
@@ -52,7 +53,10 @@ type DataRatePatternFileProvider struct {
 func NewDataRatePatternFileProvider(path string) *DataRatePatternFileProvider {
 	return &DataRatePatternFileProvider{Path: path}
 }
-func convertDRPdata(strdata *[][]string) (drp DataRatePattern, err error) {
+func convertDRPdata(strdata *[][]string, scale float64, minrate float64) (drp DataRatePattern, err error) {
+	if scale == 0 {
+		scale = 1
+	}
 	if len(*strdata) == 0 {
 		return drp,
 			errortypes.NewUserInputError("DRP seems to be invalid. No rows loaded.")
@@ -79,15 +83,15 @@ func convertDRPdata(strdata *[][]string) (drp DataRatePattern, err error) {
 			return drp,
 				errortypes.NewUserInputError("Row %d: '%s' in drp is not a valid float64", i, str[0])
 		}
-		ret[i] = float
+		ret[i] = math.Max(float*scale, minrate)
 		binary.Write(&hash_buf, binary.LittleEndian, float)
-		if float > drp.Max {
-			drp.Max = float
+		if ret[i] > drp.Max {
+			drp.Max = ret[i]
 		}
-		if float < drp.Min {
-			drp.Min = float
+		if ret[i] < drp.Min {
+			drp.Min = ret[i]
 		}
-		drp.Avg += float
+		drp.Avg += ret[i]
 	}
 	drp.Avg = drp.Avg / float64(drp.Length)
 	if _, err = hash.Write(hash_buf.Bytes()); err != nil {
@@ -149,7 +153,7 @@ func readDRPCommentPath(path string, drp *DataRatePattern) (err error) {
 	return nil
 }
 
-func (self *DataRatePatternFileProvider) Provide() (DataRatePattern, error) {
+func (self *DataRatePatternFileProvider) Provide(scale float64, minrate float64) (DataRatePattern, error) {
 	var ret = DataRatePattern{}
 	if self.Path == "" {
 		return ret,
@@ -159,10 +163,11 @@ func (self *DataRatePatternFileProvider) Provide() (DataRatePattern, error) {
 	if err != nil {
 		return ret, err
 	}
-	ret, err = convertDRPdata(strdata)
+	ret, err = convertDRPdata(strdata, scale, minrate)
 	if err != nil {
 		return ret, err
 	}
 	err = readDRPCommentPath(self.Path, &ret)
+	ret.Name = filepath.Base(self.Path)
 	return ret, err
 }

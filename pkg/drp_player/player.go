@@ -29,7 +29,7 @@ func StartDrpPlayer(session *datatypes.DB_session) {
 		exit_handler_channel <- syscall.SIGQUIT
 		return 0
 	}, 2500)
-	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", session.ChildDRP.Name, session.Dev, session.ChildDRP.Freq, session.ChildDRP.Loop)
+	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", session.ChildDRP.GetName(), session.Dev, session.ChildDRP.Freq, session.ChildDRP.IsLooping())
 
 	TC := trafficcontrol.NewTrafficControl(session.Dev)
 	time.Sleep(time.Duration(session.ChildDRP.WarmupTimeMs) * time.Millisecond)

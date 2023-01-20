@@ -22,58 +22,46 @@
 package datatypes
 
 import (
-	"bytes"
-	"crypto/md5"
 	"database/sql"
-	"encoding/binary"
 	"encoding/csv"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/telekom/aml-jens/internal/errortypes"
 	"github.com/telekom/aml-jens/internal/util"
+	"github.com/telekom/aml-jens/pkg/drp"
 )
 
 type DB_data_rate_pattern struct {
 	//Set when loading file
 	//
 	//Pk refrenced in session
-	Id         int
-	Drp_sha256 []byte
-	//Set when loading file
-	Name string
-	//Set when loading file
-	Description     sql.NullString
-	Loop            bool
-	Freq            int
-	Scale           float64
-	Nomeasure       bool
-	MinRateKbits    float64
-	Th_mq_latency   string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
-	Th_p95_latency  string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
-	Th_p99_latency  string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
-	Th_p999_latency string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
-	Th_link_usage   string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
+	Id           int
+	Freq         int
+	Scale        float64
+	Nomeasure    bool
+	MinRateKbits float64
 	//Non db-realted
+	dr_pattern   drp.DataRatePattern
 	path         string
-	pattern      []float64
-	position     int
-	operator     int8
 	WarmupTimeMs int32
-	//Stats
-	min float64
-	max float64
-	avg float64
 }
 
+func (s *DB_data_rate_pattern) GetDrp_sha256() []byte {
+	return s.dr_pattern.Sha256
+}
+func (s *DB_data_rate_pattern) GetName() string {
+	return s.dr_pattern.Name
+}
+func (s *DB_data_rate_pattern) GetDescription() sql.NullString {
+	return sql.NullString{String: s.dr_pattern.Description, Valid: s.dr_pattern.Description != ""}
+}
 func (s *DB_data_rate_pattern) GetEstimatedPlaytime() int {
-	return int(s.WarmupTimeMs/1000) + (len(s.pattern) / s.Freq)
+	return int(s.WarmupTimeMs/1000) + (s.dr_pattern.SampleCount() / s.Freq)
 }
 
 func (s *DB_data_rate_pattern) GetSQLExistsStatement() string {
@@ -83,12 +71,36 @@ func (s *DB_data_rate_pattern) GetSQLExistsArgs() []any {
 	return []any{s.Id}
 }
 
+// Returns the Thresholdvalue in the format "{a,b}"
+func (s *DB_data_rate_pattern) GetTh_mq_latency() string {
+	return s.dr_pattern.Mapping["th_mq_latency"]
+}
+
+// Returns the Thresholdvalue in the format "{a,b}"
+func (s *DB_data_rate_pattern) GetTh_p95_latency() string {
+	return s.dr_pattern.Mapping["th_p95_latency"]
+}
+
+// Returns the Thresholdvalue in the format "{a,b}"
+func (s *DB_data_rate_pattern) GetTh_p99_latency() string {
+	return s.dr_pattern.Mapping["th_p99_latency"]
+}
+
+// Returns the Thresholdvalue in the format "{a,b}"
+func (s *DB_data_rate_pattern) GetTh_p999_latency() string {
+	return s.dr_pattern.Mapping["th_p999_latency"]
+}
+
+// Returns the Thresholdvalue in the format "{a,b}"
+func (s *DB_data_rate_pattern) GetTh_link_usage() string {
+	return s.dr_pattern.Mapping["th_link_usage"]
+}
 func (s *DB_data_rate_pattern) Insert(stmt SQLStmt) error {
-	DEBUG.Printf("Inserting DRP: %v, %v, %v, %v, %v\n", s.Th_mq_latency,
-		s.Th_p95_latency,
-		s.Th_p99_latency,
-		s.Th_p999_latency,
-		s.Th_link_usage)
+	DEBUG.Printf("Inserting DRP: %v, %v, %v, %v, %v\n", s.dr_pattern.Th_mq_latency,
+		s.GetTh_p95_latency(),
+		s.GetTh_p99_latency(),
+		s.GetTh_p999_latency(),
+		s.GetTh_link_usage())
 	err := stmt.QueryRow(`INSERT INTO data_rate_pattern
 	(
 		drp_sha256,
@@ -106,18 +118,18 @@ func (s *DB_data_rate_pattern) Insert(stmt SQLStmt) error {
 	)
 	VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12 )
 	RETURNING drp_id;`,
-		s.Drp_sha256,
-		s.Name,
-		s.Description,
-		s.Loop,
+		s.GetDrp_sha256(),
+		s.GetName(),
+		s.GetDescription(),
+		s.dr_pattern.Iterator().IsLooping(),
 		s.Freq,
 		s.Scale,
 		s.MinRateKbits,
-		s.Th_mq_latency,
-		s.Th_p95_latency,
-		s.Th_p99_latency,
-		s.Th_p999_latency,
-		s.Th_link_usage).Scan(&s.Id)
+		s.dr_pattern.Th_mq_latency,
+		s.dr_pattern.Th_p95_latency,
+		s.dr_pattern.Th_p99_latency,
+		s.dr_pattern.Th_p999_latency,
+		s.dr_pattern.Th_link_usage).Scan(&s.Id)
 	return err
 }
 func (s *DB_data_rate_pattern) Sync(stmt SQLStmt) error {
@@ -133,10 +145,7 @@ func (s *DB_data_rate_pattern) Validate() (err error) {
 	if s.Scale < 0.1 {
 		return errortypes.NewUserInputError("scale factor must be greater than 0.1")
 	}
-	if s.pattern == nil {
-		return errors.New("dB_data_rate_pattern.pattern is nil")
-	}
-	if len(s.pattern) == 0 {
+	if s.dr_pattern.SampleCount() == 0 {
 		return errors.New("can't start drplay with a pattern of length 0")
 	}
 	return nil
@@ -144,13 +153,13 @@ func (s *DB_data_rate_pattern) Validate() (err error) {
 
 func (s *DB_data_rate_pattern) GetHash() []byte {
 	//This should only be invalid, if no patttern is loaded
-	return s.Drp_sha256
+	return s.GetDrp_sha256()
 }
 func (s *DB_data_rate_pattern) GetHashStr() string {
 	return hex.EncodeToString(s.GetHash())
 }
 func (s *DB_data_rate_pattern) SetLooping(endless bool) {
-	s.Loop = endless
+	s.dr_pattern.Iterator().SetLooping(endless)
 }
 func readCSV(path string) (data [][]string, err error) {
 	f, err := os.Open(path)
@@ -207,118 +216,29 @@ func readDRPCommentPath(path string) (comment string, settings map[string]string
 	return description.String(), settings, nil
 }
 
-// Loads a DRP file (*.csv) from the filesystem
-// Applys scale and minrate on load. Sets looping.
-// Changes *session
-func (drp *DB_data_rate_pattern) ParseDrpFile(path string) error {
-	var hash_buf bytes.Buffer
-	drp.operator = 1
-	drp.path = path
-	split := strings.Split(path, "/")
-	drp.Name = split[len(split)-1]
-
-	comment, dpr_eval_setting, err := readDRPCommentPath(path)
-	if err != nil {
-		return err
+func (drp *DB_data_rate_pattern) ParseDRP(provider drp.DataRatePatternProvider) error {
+	if drp.Scale <= 0 {
+		return errortypes.NewUserInputError("Scale can't be less than or equal to 0")
 	}
-	drp.Description = sql.NullString{String: comment, Valid: comment != ""}
-	value, ok := dpr_eval_setting["th_link_usage"]
-	if ok {
-		drp.Th_link_usage = value
-	}
-	value, ok = dpr_eval_setting["th_mq_latency"]
-	if ok {
-		drp.Th_mq_latency = value
-	}
-	value, ok = dpr_eval_setting["th_p95_latency"]
-	if ok {
-		drp.Th_p95_latency = value
-	}
-	value, ok = dpr_eval_setting["th_p99_latency"]
-	if ok {
-		drp.Th_p99_latency = value
-	}
-	value, ok = dpr_eval_setting["th_p999_latency"]
-	if ok {
-		drp.Th_p999_latency = value
-	}
-	data, err := readCSV(path)
-	if err != nil {
-		return err
-	}
-	if len(data) == 0 {
-		return errortypes.NewUserInputError("DRP @ '%s' seems to be invalid. No data loaded.", path)
-	}
-	if len(data[0]) != 1 {
-		return errortypes.NewUserInputError("DRP @ '%s' seems to be invalid. Too many cols loaded.", path)
-	}
-
-	drp.pattern = make([]float64, len(data))
-	drp.max = -1
-	drp.min = math.MaxFloat64
-	drp.avg = 0
-	for i, v := range data {
-		float, err := strconv.ParseFloat(v[0], 64)
-		if err != nil {
-			fmt.Printf("Error while Reading DRP: %s\n", path)
-			return fmt.Errorf("DRP (%s) in line %d '%s' : %s", path, i, v, err.Error())
-		}
-		drp.pattern[i] = math.Max(float*drp.Scale, drp.MinRateKbits)
-		binary.Write(&hash_buf, binary.LittleEndian, float)
-		if float > drp.max {
-			drp.max = float
-		}
-		if float < drp.min {
-			drp.min = float
-		}
-		drp.avg += float
-	}
-	drp.avg = drp.avg / float64(len(data)-1)
-	hash := md5.New()
-	_, err = hash.Write(hash_buf.Bytes())
-	if err != nil {
-		return err
-	}
-	drp.Drp_sha256 = hash.Sum(nil)
-	return nil
+	var err error
+	drp.dr_pattern, err = provider.Provide(drp.Scale, drp.MinRateKbits)
+	return err
 }
 func (s *DB_data_rate_pattern) GetStats() (min float64, max float64, avg float64) {
-	return s.min, s.max, s.avg
-}
-func (s *DB_data_rate_pattern) GetInternalPattern() []float64 {
-	return s.pattern
+	return s.dr_pattern.GetStats()
 }
 func (s *DB_data_rate_pattern) SetToDone() {
-	s.Loop = false
-	s.operator = +1
-	s.position = len(s.pattern)
+	s.dr_pattern.Iterator().SetDone()
 }
 func (s *DB_data_rate_pattern) IsLooping() bool {
-	return s.Loop
+	return s.dr_pattern.Iterator().IsLooping()
 }
 
 // Next returns the next DataRate in a Pattern and its position.
 // If there are no Items left (and looping is turned off),
 // An error is returned instead
 func (drp *DB_data_rate_pattern) Next() (value float64, err error) {
-	last_pos := drp.position
-	if drp.position >= len(drp.pattern) {
-		if drp.Loop {
-			drp.operator = -1
-			last_pos -= 1
-			drp.position -= 1
-		} else {
-			return -1, &errortypes.IterableStopError{Msg: "end of DRP"}
-		}
-	}
-	if drp.position < 0 && drp.Loop {
-		drp.operator = +1
-		last_pos += 1
-		drp.position += 1
-	}
-
-	drp.position += int(drp.operator)
-	return drp.pattern[last_pos], nil
+	return drp.dr_pattern.Iterator().Next()
 }
 
 // Next returns the next DataRate in a Pattern and its position.
@@ -326,14 +246,10 @@ func (drp *DB_data_rate_pattern) Next() (value float64, err error) {
 //
 //go:inline
 func (drp *DB_data_rate_pattern) Peek() (value float64) {
-	return drp.pattern[drp.position]
+	return drp.dr_pattern.Iterator().Value()
 }
 func NewDB_data_rate_pattern() *DB_data_rate_pattern {
 	return &DB_data_rate_pattern{
-		Th_mq_latency:   "{2,4}",
-		Th_p95_latency:  "{10,20}",
-		Th_p99_latency:  "{10,20}",
-		Th_p999_latency: "{10,20}",
-		Th_link_usage:   "{60,80}",
+		dr_pattern: *drp.NewDataRatePattern("memory"),
 	}
 }

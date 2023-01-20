@@ -30,28 +30,16 @@ import (
 
 func TestIterator_saw(t *testing.T) {
 	var path = filepath.Join(paths.TESTDATA_DRP(), "saw.csv")
-	drp, err := NewDataRatePatternFileProvider(path).Provide()
+	drp, err := NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		t.Fatal(err)
-	}
-	expected := []float64{
-		10000,
-		20000,
-		30000,
-		40000,
-		50000,
-		60000,
-		70000,
-		80000,
-		90000,
-		100000,
 	}
 	iter := drp.Iterator()
 	pos := 0
 	for v, err := iter.Next(); err == nil; v, err = iter.Next() {
 		t.Log(pos, v)
-		if expected[pos] != v {
-			t.Fatalf("Got unexpected value '%f' @ %d, (!= %f)", v, pos, expected[pos])
+		if ExpectationSaw[pos] != v {
+			t.Fatalf("Got unexpected value '%f' @ %d, (!= %f)", v, pos, ExpectationSaw[pos])
 		}
 		if pos > 10 {
 			t.Fatal("No Iterator Exception was thrown")
@@ -64,25 +52,34 @@ func TestIterator_saw(t *testing.T) {
 }
 func TestIteratorValue_saw(t *testing.T) {
 	var path = filepath.Join(paths.TESTDATA_DRP(), "saw.csv")
-	drp, err := NewDataRatePatternFileProvider(path).Provide()
+	drp, err := NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	iter := drp.Iterator()
 	if iter.Value() != 10000 {
-		t.Fatalf("Value before Next is %f", iter.Value())
+		t.Fatalf("Value before first call to Next() is %f", iter.Value())
 	}
+	pos := 0
 	for v, err := iter.Next(); err == nil; v, err = iter.Next() {
-		if iter.Value() != v {
-			t.Logf("Value was %f", v)
+		v_got := iter.Value()
+		t.Log(v_got)
+		if v_got != v {
 			t.Fatalf("Got unexpected Value():'%f'!= %f)", iter.Value(), v)
 		}
+		pos++
+		if pos > 11 {
+			t.Fatal("Next() does not return error")
+		}
+	}
+	if pos < 10 {
+		t.Fatal("Not all entries in drp were played")
 	}
 }
 
 func TestIterator_saw_loop(t *testing.T) {
 	var path = filepath.Join(paths.TESTDATA_DRP(), "saw.csv")
-	drp, err := NewDataRatePatternFileProvider(path).Provide()
+	drp, err := NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,12 +119,11 @@ func TestIterator_saw_loop(t *testing.T) {
 	iter.SetLooping(true)
 	pos := 0
 	for v, err := iter.Next(); err == nil; v, err = iter.Next() {
-
 		if pos < 30 && expected[pos] != v {
 			t.Fatalf("Got unexpected value '%f' @ %d, (!= %f)", v, pos, expected[pos])
 		}
 		if pos > 103 {
-			return
+			return //All good!
 		}
 		if iter.Value() != v {
 			t.Fatalf("Value() %f != %f Next()", iter.Value(), v)
@@ -143,7 +139,7 @@ var result float64
 
 func BenchmarkDRPIter(b *testing.B) {
 	var path = filepath.Join(paths.TESTDATA_DRP(), "drp_3_valleys.csv")
-	drp, err := NewDataRatePatternFileProvider(path).Provide()
+	drp, err := NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		b.Skip()
 	}

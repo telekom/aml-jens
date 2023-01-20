@@ -40,7 +40,7 @@ const rootID = "root"
 var ErrorOrNil error = nil
 
 func Run(path string) error {
-	drp, err := drp.NewDrpFromFile(path)
+	drp, err := drp.NewDataRatePatternFileProvider(path).Provide(0, 0)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func Run(path string) error {
 			cancel()
 		}
 	}
-	updateChannel.UpdateDrpGlobally(*drp)
+	updateChannel.UpdateDrpGlobally(drp)
 	if err := termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(quitter), termdash.RedrawInterval(50*time.Millisecond)); err != nil {
 		return err
 	}
