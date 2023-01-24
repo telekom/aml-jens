@@ -54,10 +54,10 @@ func (c *config) readFromFile() error {
 	}
 	INFO.Printf("Config used: %s", viper.ConfigFileUsed())
 	drp := datatypes.NewDB_data_rate_pattern()
-	drp.MinRateKbits = viper.GetFloat64("drp.minRateKbits")
+	drp.Intial_minRateKbits = viper.GetFloat64("drp.minRateKbits")
 	drp.WarmupTimeMs = viper.GetInt32("drp.WarmupBeforeDrpMs")
 	drp.Freq = -1
-	drp.Scale = -1
+	drp.Initial_scale = -1
 	asd := datatypes.DB_session{
 		//TC
 		Markfree:            viper.GetInt32("tccommands.markfree"),
@@ -118,10 +118,10 @@ func (c *config) readFromFile() error {
 // present in any specified directory.
 func (c *config) setToDefaults() {
 	drp := datatypes.NewDB_data_rate_pattern()
-	drp.MinRateKbits = 500
+	drp.Intial_minRateKbits = 500
 	drp.WarmupTimeMs = 2000
 	drp.Freq = -1
-	drp.Scale = -1
+	drp.Initial_scale = -1
 	asd := datatypes.DB_session{
 		//TC
 		Markfree:            4,

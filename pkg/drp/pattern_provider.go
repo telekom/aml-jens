@@ -61,6 +61,15 @@ func convertDRPdata(strdata *[][]string, scale float64, minrate float64) (drp Da
 		return drp,
 			errortypes.NewUserInputError("DRP seems to be invalid. No rows loaded.")
 	}
+	drp.loadParameters = struct {
+		MinRateKbits float64
+		Scale        float64
+		Origin       string
+	}{
+		MinRateKbits: minrate,
+		Scale:        scale,
+		Origin:       "Filesystem",
+	}
 	drp.Min = math.MaxFloat64
 	drp.Max = -1
 	drp.Avg = 0
