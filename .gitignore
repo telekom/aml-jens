@@ -4,7 +4,10 @@
 *.dll
 *.so
 *.dylib
+
+# Generated binaries/ packages etc.
 bin/*
+out/*
 
 # Test binary, built with `go test -c`
 *.test
@@ -28,7 +31,3 @@ go.work
 
 # Generated debian packages
 *.deb
-# Generated executables
-build/dr*
-build/deb/jens-cli-[0-9]*
-*/***/testdata/*

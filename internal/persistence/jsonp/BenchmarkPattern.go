@@ -57,8 +57,8 @@ func (bp *BenchmarkPattern) loadPattern() error {
 		return errors.New("can't load a pattern without a path")
 	}
 	bp.pattern = &datatypes.DB_data_rate_pattern{
-		MinRateKbits: 0.9652,
-		Scale:        0.9999965,
+		Intial_minRateKbits: 0.9652,
+		Initial_scale:       0.9999965,
 	}
 	return bp.pattern.ParseDRP(drp.NewDataRatePatternFileProvider(bp.Path))
 }

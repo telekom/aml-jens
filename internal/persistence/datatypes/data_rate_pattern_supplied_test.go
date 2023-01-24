@@ -70,7 +70,7 @@ func TestStdDrp(t *testing.T) {
 	}
 	for _, v := range drps {
 		db_drp := datatypes.DB_data_rate_pattern{
-			Scale: 1,
+			Initial_scale: 1,
 		}
 		err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), v)))
 		if err != nil {

@@ -23,16 +23,10 @@ package datatypes
 
 import (
 	"database/sql"
-	"encoding/csv"
 	"encoding/hex"
 	"errors"
-	"fmt"
-	"os"
-	"regexp"
-	"strings"
 
 	"github.com/telekom/aml-jens/internal/errortypes"
-	"github.com/telekom/aml-jens/internal/util"
 	"github.com/telekom/aml-jens/pkg/drp"
 )
 
@@ -40,15 +34,15 @@ type DB_data_rate_pattern struct {
 	//Set when loading file
 	//
 	//Pk refrenced in session
-	Id           int
-	Freq         int
-	Scale        float64
-	Nomeasure    bool
-	MinRateKbits float64
+	Id        int
+	Freq      int
+	Nomeasure bool
 	//Non db-realted
 	dr_pattern   drp.DataRatePattern
-	path         string
 	WarmupTimeMs int32
+
+	Intial_minRateKbits float64
+	Initial_scale       float64
 }
 
 func (s *DB_data_rate_pattern) GetDrp_sha256() []byte {
@@ -123,8 +117,8 @@ func (s *DB_data_rate_pattern) Insert(stmt SQLStmt) error {
 		s.GetDescription(),
 		s.dr_pattern.Iterator().IsLooping(),
 		s.Freq,
-		s.Scale,
-		s.MinRateKbits,
+		s.dr_pattern.GetScale(),
+		s.dr_pattern.GetMinRateKbits(),
 		s.dr_pattern.Th_mq_latency,
 		s.dr_pattern.Th_p95_latency,
 		s.dr_pattern.Th_p99_latency,
@@ -142,7 +136,7 @@ func (s *DB_data_rate_pattern) Validate() (err error) {
 		return errortypes.NewUserInputError("frequency must be in intervall [1..100]")
 	}
 
-	if s.Scale < 0.1 {
+	if s.dr_pattern.GetScale() < 0.1 {
 		return errortypes.NewUserInputError("scale factor must be greater than 0.1")
 	}
 	if s.dr_pattern.SampleCount() == 0 {
@@ -161,67 +155,13 @@ func (s *DB_data_rate_pattern) GetHashStr() string {
 func (s *DB_data_rate_pattern) SetLooping(endless bool) {
 	s.dr_pattern.Iterator().SetLooping(endless)
 }
-func readCSV(path string) (data [][]string, err error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, errortypes.NewUserInputError("Could not read '%s': %s", path, err)
-	}
-	// remember to close the file at the end of the program
-	defer f.Close()
-	// read csv values
-	csvReader := csv.NewReader(f)
-	csvReader.Comment = '#'
-	data, err = csvReader.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func readDRPCommentPath(path string) (comment string, settings map[string]string, err error) {
-	settings = make(map[string]string, 5)
-	var description strings.Builder
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", settings, errortypes.NewUserInputError("Could not read '%s': %s", path, err)
-	}
-	var two_values = regexp.MustCompile(`(?m)[0-9]+,[0-9]+`)
-	for _, v := range strings.Split(string(data), "\n") {
-		if !strings.HasPrefix(v, "#") {
-			return description.String(), settings, nil
-		}
-		no_white_space := util.RemoveWhiteSpace(v)
-		if len(no_white_space) < 2 {
-			//Ignore
-			continue
-		}
-		if no_white_space[1] != ':' {
-			description.WriteString(v[1:] + "\n")
-			continue
-		}
-
-		E := func(s string) error { return fmt.Errorf("error Parsing EvalSetting: '%s'; %s", no_white_space, s) }
-		sep := strings.Split(no_white_space[2:], "=")
-		var_name := sep[0]
-		var_value := sep[1]
-		if len(sep) != 2 {
-			return "", settings, E("Not a valid assignment")
-		}
-		if !two_values.MatchString(var_value) {
-			INFO.Printf("Ignoring: %s=%s ", var_name, var_value)
-		}
-		settings[var_name] = fmt.Sprintf("{%s}", var_value)
-
-	}
-	return description.String(), settings, nil
-}
 
 func (drp *DB_data_rate_pattern) ParseDRP(provider drp.DataRatePatternProvider) error {
-	if drp.Scale <= 0 {
+	if drp.Initial_scale <= 0 {
 		return errortypes.NewUserInputError("Scale can't be less than or equal to 0")
 	}
 	var err error
-	drp.dr_pattern, err = provider.Provide(drp.Scale, drp.MinRateKbits)
+	drp.dr_pattern, err = provider.Provide(drp.Initial_scale, drp.Intial_minRateKbits)
 	return err
 }
 func (s *DB_data_rate_pattern) GetStats() (min float64, max float64, avg float64) {
@@ -250,6 +190,12 @@ func (drp *DB_data_rate_pattern) Peek() (value float64) {
 }
 func NewDB_data_rate_pattern() *DB_data_rate_pattern {
 	return &DB_data_rate_pattern{
-		dr_pattern: *drp.NewDataRatePattern("memory"),
+		Initial_scale:       1,
+		Intial_minRateKbits: 0,
+		dr_pattern: *drp.NewDataRatePattern(struct {
+			MinRateKbits float64
+			Scale        float64
+			Origin       string
+		}{MinRateKbits: 0, Scale: 1, Origin: "memory"}),
 	}
 }

@@ -40,8 +40,8 @@ var SAW_PATH = filepath.Join(paths.TESTDATA_DRP(), "saw.csv")
 
 func TestDrpNaming(t *testing.T) {
 	db_drp := datatypes.DB_data_rate_pattern{
-		Scale:        1,
-		MinRateKbits: 500,
+		Initial_scale:       1,
+		Intial_minRateKbits: 500,
 	}
 	err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(GOOD_PATH))
 	if err != nil {
@@ -58,8 +58,8 @@ func TestDrpNaming(t *testing.T) {
 
 func TestDrpMinrateAndLen(t *testing.T) {
 	db_drp := datatypes.DB_data_rate_pattern{
-		Scale:        1,
-		MinRateKbits: 20400,
+		Initial_scale:       1,
+		Intial_minRateKbits: 20400,
 	}
 	err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(GOOD_PATH))
 	if err != nil {
@@ -86,8 +86,8 @@ func TestDrpMinrateAndLen(t *testing.T) {
 
 func TestDrpHash(t *testing.T) {
 	db_drp := datatypes.DB_data_rate_pattern{
-		Scale:        1,
-		MinRateKbits: 20400,
+		Initial_scale:       1,
+		Intial_minRateKbits: 20400,
 	}
 	err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(SAW_PATH))
 	if err != nil {
@@ -101,20 +101,20 @@ func TestDrpHash(t *testing.T) {
 func TestDrpHashWithChangesToScaleMinLoop(t *testing.T) {
 	db_drps := []datatypes.DB_data_rate_pattern{
 		{
-			Scale:        1,
-			MinRateKbits: 20400,
+			Initial_scale:       1,
+			Intial_minRateKbits: 20400,
 		},
 		{
-			Scale:        2,
-			MinRateKbits: 20400,
+			Initial_scale:       2,
+			Intial_minRateKbits: 20400,
 		},
 		{
-			Scale:        1,
-			MinRateKbits: 50400,
+			Initial_scale:       1,
+			Intial_minRateKbits: 50400,
 		},
 		{
-			Scale:        3,
-			MinRateKbits: 120400,
+			Initial_scale:       3,
+			Intial_minRateKbits: 120400,
 		},
 	}
 	for i, v := range db_drps {
@@ -143,8 +143,8 @@ func TestBroken(t *testing.T) {
 
 		path := filepath.Join(paths.TESTDATA_DRP(), v.Name())
 		db_drp := datatypes.DB_data_rate_pattern{
-			Scale:        1,
-			MinRateKbits: 20400,
+			Initial_scale:       1,
+			Intial_minRateKbits: 20400,
 		}
 		err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), v.Name())))
 		if err == nil {
@@ -158,8 +158,8 @@ func TestBroken(t *testing.T) {
 func TestDrpValueNoLoop(t *testing.T) {
 	var expected = []float64{10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000}
 	drp_db := datatypes.DB_data_rate_pattern{
-		Scale:        1,
-		MinRateKbits: 600,
+		Initial_scale:       1,
+		Intial_minRateKbits: 600,
 	}
 	err := drp_db.ParseDRP(drp.NewDataRatePatternFileProvider(SAW_PATH))
 	if err != nil {
@@ -193,8 +193,8 @@ func TestDrpValueLoop(t *testing.T) {
 		10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000,
 	}
 	db_drp := datatypes.DB_data_rate_pattern{
-		Scale:        1,
-		MinRateKbits: 600,
+		Initial_scale:       1,
+		Intial_minRateKbits: 600,
 	}
 	err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(SAW_PATH))
 	if err != nil {
