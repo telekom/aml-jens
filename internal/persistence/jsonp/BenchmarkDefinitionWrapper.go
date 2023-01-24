@@ -114,8 +114,8 @@ func ReadTcValuesWithFallbacks(fb *datatypes.DB_session, tc ...*DrPlayTrafficCon
 }
 func ReadDrpValuesWithFallbacks(fb *datatypes.DB_data_rate_pattern, drp ...*DrPlayDataRateConfig) (scale float64, freq int, minrate float64, warmup int32) {
 	freq = fb.Freq
-	scale = fb.Scale
-	minrate = fb.MinRateKbits
+	scale = fb.Initial_scale
+	minrate = fb.Intial_minRateKbits
 	warmup = fb.WarmupTimeMs
 	freq_set := false
 	scale_set := false
@@ -173,8 +173,8 @@ func LoadDB_benchmarkFromJson(path string) (*datatypes.DB_benchmark, error) {
 		db_drp := datatypes.NewDB_data_rate_pattern()
 		db_drp.SetLooping(false)
 		db_drp.Freq = f
-		db_drp.Scale = s
-		db_drp.MinRateKbits = m
+		db_drp.Initial_scale = s
+		db_drp.Intial_minRateKbits = m
 		db_drp.WarmupTimeMs = w
 
 		db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(v.Path))

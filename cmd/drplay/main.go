@@ -76,7 +76,7 @@ func ArgParse() (err error) {
 		"output measure records to csv file")
 
 	flag.Float64Var(
-		&result.ChildDRP.Scale,
+		&result.ChildDRP.Initial_scale,
 		"scale",
 		1,
 		"defines a scale factor which will be used to multiply the drp;  must be greater 0.1")

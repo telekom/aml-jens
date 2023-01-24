@@ -151,13 +151,13 @@ func validate(t *testing.T, set []int, sess *datatypes.DB_session, cleanup func(
 		}
 	*/
 
-	if sess.ChildDRP.Scale != 0.36 {
+	if sess.ChildDRP.Initial_scale != 0.36 {
 		if contains(set, 5) {
 			cleanup()
 			t.Fatalf(caseA, 5, "-scale=0.36")
 		} else {
 			cleanup()
-			t.Fatalf(caseB, 5, fmt.Sprintf("-scale=%f", sess.ChildDRP.Scale))
+			t.Fatalf(caseB, 5, fmt.Sprintf("-scale=%f", sess.ChildDRP.Initial_scale))
 		}
 
 	}

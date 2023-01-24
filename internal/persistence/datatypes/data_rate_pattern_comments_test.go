@@ -31,10 +31,7 @@ import (
 )
 
 func TestGenericComment(t *testing.T) {
-	data := datatypes.DB_data_rate_pattern{
-		Scale:        1,
-		MinRateKbits: 20400,
-	}
+	data := datatypes.NewDB_data_rate_pattern()
 	p := paths.TESTDATA_DRP()
 	path := filepath.Join(p, "drp_3valleys_generic_comment.csv")
 
@@ -52,8 +49,8 @@ func TestGenericComment(t *testing.T) {
 
 func TestKeyValueComment(t *testing.T) {
 	data := datatypes.DB_data_rate_pattern{
-		Scale:        1,
-		MinRateKbits: 20400,
+		Initial_scale:       1,
+		Intial_minRateKbits: 20400,
 	}
 	err := data.ParseDRP(drp.NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), "drp_3valleys_kv_comment.csv")))
 	if err != nil {

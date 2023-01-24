@@ -33,7 +33,6 @@ type DataRatePattern struct {
 	iter            *DataRatePatternIterator
 	Name            string
 	data            *[]float64
-	Origin          string
 	Description     string
 	Mapping         map[string]string
 	Min             float64
@@ -46,15 +45,24 @@ type DataRatePattern struct {
 	Th_p99_latency  string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
 	Th_p999_latency string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
 	Th_link_usage   string //Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
+	loadParameters  struct {
+		MinRateKbits float64
+		Scale        float64
+		Origin       string
+	}
 }
 
-func NewDataRatePattern(origin string) *DataRatePattern {
-	filenameS := strings.Split(origin, "/")
+func NewDataRatePattern(params struct {
+	MinRateKbits float64
+	Scale        float64
+	Origin       string
+}) *DataRatePattern {
+	filenameS := strings.Split(params.Origin, "/")
 	filename := strings.Split(filenameS[len(filenameS)-1], ".")
 
 	return &DataRatePattern{
 		Name:            strings.Join(filename[:len(filename)-1], ""),
-		Origin:          origin,
+		loadParameters:  params,
 		Min:             0,
 		Max:             0,
 		Avg:             0,
@@ -68,6 +76,16 @@ func NewDataRatePattern(origin string) *DataRatePattern {
 }
 func (s *DataRatePattern) SampleCount() int {
 	return len(*s.data)
+}
+
+func (s *DataRatePattern) GetMinRateKbits() float64 {
+	return s.loadParameters.MinRateKbits
+}
+func (s *DataRatePattern) GetScale() float64 {
+	return s.loadParameters.Scale
+}
+func (s *DataRatePattern) GetOrigin() string {
+	return s.loadParameters.Origin
 }
 func (s *DataRatePattern) SetData(d []float64) {
 	cpy := make([]float64, len(d))

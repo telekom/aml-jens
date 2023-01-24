@@ -89,7 +89,7 @@ func TestConfig(t *testing.T) {
 		c.player.A_Session.SignalDrpStart == true,
 		c.player.A_Session.ExtralatencyMs == 10,
 		c.player.A_Session.ChildDRP.WarmupTimeMs == 1000,
-		c.player.A_Session.ChildDRP.MinRateKbits == 1,
+		c.player.A_Session.ChildDRP.Intial_minRateKbits == 1,
 	}
 	other := []bool{
 		c.player.Psql.Dbname == "dbname",
