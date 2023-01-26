@@ -22,7 +22,6 @@
 package util_test
 
 import (
-	"log"
 	"testing"
 
 	"github.com/telekom/aml-jens/internal/util"
@@ -30,7 +29,7 @@ import (
 
 func TestFloorToInt(t *testing.T) {
 	if util.FloorToInt(1.9) != 1 {
-		log.Fatalf("1.9 was not floored to 1. (was: %d)", util.FloorToInt(1.9))
+		t.Fatalf("1.9 was not floored to 1. (was: %d)", util.FloorToInt(1.9))
 	}
 }
 

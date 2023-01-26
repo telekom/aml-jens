@@ -26,6 +26,7 @@ import (
 	"fmt"
 
 	"github.com/telekom/aml-jens/cmd/drshow/internal/data/channel"
+	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/util"
 
 	"github.com/mum4k/termdash/cell"
@@ -33,13 +34,15 @@ import (
 	"github.com/mum4k/termdash/widgets/text"
 )
 
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
+
 func NewDrpDetailsTextBox(ctx context.Context, t terminalapi.Terminal, chans *channel.DrpChannels) (*text.Text, error) {
 	wrapped, err := text.New(text.WrapAtRunes())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if err := wrapped.Write("No Flow selected", text.WriteCellOpts(cell.FgColor(cell.ColorRed))); err != nil {
-		panic(err)
+		return nil, err
 	}
 	go func() {
 		for {
@@ -48,8 +51,7 @@ func NewDrpDetailsTextBox(ctx context.Context, t terminalapi.Terminal, chans *ch
 				wrapped.Reset()
 				err := wrapped.Write(fmt.Sprintf("Pattern: %s\nSamples: %d\nMinimum: %s\nMaximum: %s\nAverage: %s\nPath:    %s", drp.Name, drp.SampleCount(), util.FormatLabelISOKilo(drp.Min), util.FormatLabelISOKilo(drp.Max), util.FormatLabelISOKilo(drp.Avg), drp.GetOrigin()))
 				if err != nil {
-					panic(err)
-
+					WARN.Println(err)
 				}
 			case <-ctx.Done():
 				return

@@ -39,10 +39,10 @@ import (
 func NewFlowDetailsTextBox(ctx context.Context, t terminalapi.Terminal, chans *channel.FlowChannels) (*text.Text, error) {
 	wrapped, err := text.New(text.WrapAtRunes())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if err := wrapped.Write("Make a flow-selection\n(SingleMode)", text.WriteCellOpts(cell.FgColor(cell.ColorMagenta))); err != nil {
-		panic(err)
+		return nil, err
 	}
 	updateText := func(flow *flowdata.FlowT) {
 		wrapped.Reset()
@@ -66,9 +66,7 @@ func NewFlowDetailsTextBox(ctx context.Context, t terminalapi.Terminal, chans *c
 
 		err := wrapped.Write(txt)
 		if err != nil {
-			log.Fatal(err)
-			panic(err)
-
+			WARN.Println(err)
 		}
 	}
 	go func() {

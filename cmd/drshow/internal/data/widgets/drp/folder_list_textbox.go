@@ -35,10 +35,10 @@ import (
 func NewDrpListTextBox(ctx context.Context, t terminalapi.Terminal, up *channel.DrpChannels) (*text.Text, error) {
 	wrapped, err := text.New(text.WrapAtRunes())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if err := wrapped.Write("Waiting for Flows", text.WriteCellOpts(cell.FgColor(cell.ColorRed))); err != nil {
-		panic(err)
+		return nil, err
 	}
 	defaultOpts := text.WriteCellOpts()
 	selectedOpts := text.WriteCellOpts(cell.Bold())
@@ -57,13 +57,7 @@ func NewDrpListTextBox(ctx context.Context, t terminalapi.Terminal, up *channel.
 					} else {
 						wrapped.Write(">")
 					}
-					err := wrapped.Write(fmt.Sprintf("  %s\n", drp.Name), opts)
-					if err != nil {
-						panic("Error while writing to flowlist")
-					}
-					if err != nil {
-						panic("Error while writing to flowlist")
-					}
+					wrapped.Write(fmt.Sprintf("  %s\n", drp.Name), opts)
 				}
 			case <-ctx.Done():
 				return

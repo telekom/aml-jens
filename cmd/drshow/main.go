@@ -43,7 +43,7 @@ const (
 	mode_help
 )
 
-var _, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func parseArgs(res *string) (mode, error) {
 	Nargs := len(os.Args) - 1

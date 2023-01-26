@@ -38,7 +38,7 @@ import (
 	drplay "github.com/telekom/aml-jens/pkg/drp_player"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func ArgParse() (err error) {
 	result := config.PlayCfg().A_Session

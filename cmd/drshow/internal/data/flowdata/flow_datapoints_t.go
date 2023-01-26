@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -100,7 +100,7 @@ func (s *FlowDatapointsT) calcLength() int {
 		len(*s.Ecn) == len(*s.Sojourn) &&
 		len(*s.Sojourn) == len(*s.Dropp) &&
 		len(*s.Dropp) == len(*s.Delay)) {
-		panic("FlowDatapoints are not in SYNC!")
+		FATAL.Exitln("FlowDatapoints are not in SYNC!")
 	}
 	return length
 }
