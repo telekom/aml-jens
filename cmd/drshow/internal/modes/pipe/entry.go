@@ -23,7 +23,6 @@ package pipe
 
 import (
 	"context"
-	"log"
 	"os"
 	"time"
 
@@ -32,6 +31,7 @@ import (
 	"github.com/telekom/aml-jens/cmd/drshow/internal/data/widgets/shared"
 	"github.com/telekom/aml-jens/cmd/drshow/internal/modes"
 	"github.com/telekom/aml-jens/internal/config"
+	"github.com/telekom/aml-jens/internal/logging"
 
 	"github.com/mum4k/termdash"
 	"github.com/mum4k/termdash/cell"
@@ -47,8 +47,10 @@ const rootID = "root"
 var exitMsg *string = nil
 var exitCode uint8 = 0
 var fromError = func(e error) (uint8, string) {
+	INFO.Println(e.Error())
 	return 255, e.Error()
 }
+var DEBUG, INFO, FATAL = logging.GetLogger()
 
 func Run() (uint8, string) {
 
@@ -57,7 +59,6 @@ func Run() (uint8, string) {
 	if !success {
 		os.Exit(-1)
 	}
-	manager.MainSTDinReadLoop(reader)
 
 	C := coms.NewFlowChannels()
 	var t terminalapi.Terminal
@@ -73,40 +74,8 @@ func Run() (uint8, string) {
 		return fromError(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	log.Printf("Terminal with size: %dx%d", t.Size().X, t.Size().Y)
-	//Common instructions for both increment and decrement
-	cbFlowListAfter := func() error {
-		flow, err := manager.GetSelectedFlow()
-		if err != nil {
-			return nil
-		}
-		C.RedrawUIWithLayout <- flow.FlowId
-		return nil
-	}
-	cbFlowListInc := func() error {
-		err := manager.SelectNextFlowIndex()
-		if err == nil {
-			return cbFlowListAfter()
-		}
-		return nil
-	}
-	cbFlowListDec := func() error {
-		err := manager.SelectPreviousFlowIndex()
-		if err == nil {
-			return cbFlowListAfter()
-		}
-		return nil
-	}
+	DEBUG.Printf("Terminal with size: %dx%d", t.Size().X, t.Size().Y)
 
-	//Create CustomUI Object
-	ui, err := NewUI(ctx, t, c, &uiSettings{
-		cb_flow_listInc: cbFlowListInc,
-		cb_flow_listDec: cbFlowListDec,
-	}, C, manager)
-	if err != nil {
-		cancel()
-		return fromError(err)
-	}
 	//All necessary components are defined. ManagerCallbacks
 	//can now be defined
 	manager.SetHandler(flowdata.FlowManagerEventHanderlerT{
@@ -144,6 +113,43 @@ func Run() (uint8, string) {
 			exitMsg = &text
 		},
 	})
+
+	manager.MainSTDinReadLoop(reader)
+
+	//Common instructions for both increment and decrement
+	cbFlowListAfter := func() error {
+		flow, err := manager.GetSelectedFlow()
+		if err != nil {
+			return nil
+		}
+		C.RedrawUIWithLayout <- flow.FlowId
+		return nil
+	}
+	cbFlowListInc := func() error {
+		err := manager.SelectNextFlowIndex()
+		if err == nil {
+			return cbFlowListAfter()
+		}
+		return nil
+	}
+	cbFlowListDec := func() error {
+		err := manager.SelectPreviousFlowIndex()
+		if err == nil {
+			return cbFlowListAfter()
+		}
+		return nil
+	}
+
+	//Create CustomUI Object
+	ui, err := NewUI(ctx, t, c, &uiSettings{
+		cb_flow_listInc: cbFlowListInc,
+		cb_flow_listDec: cbFlowListDec,
+	}, C, manager)
+	if err != nil {
+		cancel()
+		return fromError(err)
+	}
+
 	/*
 		gridOpts, err := ui.Layout(LayoutCombined) // equivalent to contLayout(w)
 		if err != nil {
@@ -210,7 +216,7 @@ func Run() (uint8, string) {
 				go func() {
 					err := flow.ExportToFile(config.ShowCfg().ExportPathPrefix)
 					if err != nil {
-						log.Printf("Error while exporting [%d]: %s\n", manager.GetSelectedFlowIndex(), err.Error())
+						INFO.Printf("Error while exporting [%d]: %s\n", manager.GetSelectedFlowIndex(), err.Error())
 					}
 				}()
 			}
