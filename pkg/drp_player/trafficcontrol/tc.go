@@ -178,10 +178,7 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, wg *sync.Wait
 			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
 		}()
 	}
-	// open controll file for rate changes
-
 	for range ticker.C {
-		// perhaps signal start of drp to clients by marking with ECT0
 		value, err := drp.Next()
 		if err != nil {
 			if _, ok := err.(*errortypes.IterableStopError); ok {
@@ -191,7 +188,7 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, wg *sync.Wait
 				FATAL.Println(err)
 			}
 		}
-		//change data rate in controll file
+		//change data rate in control file
 		if err := tc.ChangeTo(value); err != nil {
 			return err
 		}

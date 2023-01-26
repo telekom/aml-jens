@@ -40,7 +40,10 @@ func TestIsDirectory(t *testing.T) {
 
 func TestIsDirectoryFalse(t *testing.T) {
 	path := "/tmp/file"
-	os.Create(path)
+	_, err := os.Create(path)
+	if err != nil {
+		t.Skip()
+	}
 	isdir, err := util.IsDirectory(path)
 	if err != nil {
 		t.Fatal(err)

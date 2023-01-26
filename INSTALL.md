@@ -5,18 +5,20 @@ measures of the state of the l4s queue are sampled (10ms) and can be stored (csv
 The data rate pattern is defined in a csv file, an example is provided at /etc/jens-cli/drp_3valleys.csv.
 The command drshow visualizes measures or data rate patterns on a terminal ui.
 
-**The Package provides two executables (`drplay` & `drshow`)**
+**The Package provides tree executables (`drplay` & `drshow` & `drbenchmark`)**
 
 # Installation
 
 ## Prerequisites
-* Hardware AMD64
 * Deactivate `secure boot` option in the BIOS
 * Running Debian system (version: `bullseye`)
 * Installation of docker (if grafana/postgres container should run)
 
 ## Installation on a Debian-System:
 **jens-cli runs on debian linux, it requires an update of kernel packages. This means it cannot be used from within a docker-container.**
+
+**But it can be installed in a VM. following the same steps**
+
 `Root` privileges are required
 
 * Make the JENS package repository visible by executing the script `setupApt.sh`
@@ -94,6 +96,9 @@ Various Stats are displayed in a human readable UI.
 ```sh
 drplay [opts] | drshow
 ```
+#### Note
+`drshow` might not react to Ctrl-C in Pipemode if there is no traffic on the interface used together with `drplay`. In this case, for now, close and reopen the terminal window. 
+
 ### Mode 2: StaticMode
 Additional Help: `drshow -h static`
 
@@ -102,13 +107,12 @@ When a directory is choosen, the user can navigate the .csv files and inspect th
 ```sh
 drshow patterns/mydrp.csv
 ```
-
 ## drbenchmark
-Drshow is tool to launch drplay multiple times with set configurations 
+`drshow` is tool to launch drplay multiple times with set configurations 
 
 For help regarding this command see `man drbenchmark` or `drbenchmark --help`.
 
-DrBenchmark uses JSON configurations to define a Benchmark.
+`drbenchmark` uses JSON configurations to define a Benchmark.
 
 ```json
 {

@@ -41,7 +41,15 @@ func TestConvertDRPdata_OK_saw(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := convertDRPdata(strdata, 0, 0)
+	data, err := convertDRPdata(strdata, struct {
+		MinRateKbits float64
+		Scale        float64
+		Origin       string
+	}{
+		Scale:        1,
+		MinRateKbits: 0,
+		Origin:       "Test: " + path,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,16 +78,16 @@ func TestConvertDRPdata_OK_saw(t *testing.T) {
 		100000,
 	}
 	if len(*data.data) != len(expected) &&
-		(*data.data)[1-1] != expected[1-1] &&
-		(*data.data)[2-1] != expected[2-1] &&
-		(*data.data)[3-1] != expected[3-1] &&
-		(*data.data)[4-1] != expected[4-1] &&
-		(*data.data)[5-1] != expected[5-1] &&
-		(*data.data)[6-1] != expected[6-1] &&
-		(*data.data)[7-1] != expected[7-1] &&
-		(*data.data)[8-1] != expected[8-1] &&
-		(*data.data)[9-1] != expected[9-1] &&
-		(*data.data)[10-1] != expected[10-1] {
+		(*data.data)[0] != expected[0] &&
+		(*data.data)[1] != expected[1] &&
+		(*data.data)[2] != expected[2] &&
+		(*data.data)[3] != expected[3] &&
+		(*data.data)[4] != expected[4] &&
+		(*data.data)[5] != expected[5] &&
+		(*data.data)[6] != expected[6] &&
+		(*data.data)[7] != expected[7] &&
+		(*data.data)[8] != expected[8] &&
+		(*data.data)[9] != expected[9] {
 		t.Log(data.data)
 		t.Fatal("drp-data was not loaded correctly")
 	}
@@ -150,35 +158,35 @@ I expect this to also count as a comment
 		t.Fatal("Generic comment was incorrectly read")
 	}
 
-	v, found := data.Mapping["th_mq_latency"]
+	v, found := data.mapping["th_mq_latency"]
 	if !found {
 		t.Fatalf("Key 'th_mq_latency' not found")
 	}
 	if v != "{3,6}" {
 		t.Fatalf("th_mq_latency!=3,6; Got: %s", v)
 	}
-	v, found = data.Mapping["th_p95_latency"]
+	v, found = data.mapping["th_p95_latency"]
 	if !found {
 		t.Fatalf("Key 'th_p95_latency' not found")
 	}
 	if v != "{11,21}" {
 		t.Fatalf("th_p95_latency!=11,21; Got: %s", v)
 	}
-	v, found = data.Mapping["th_p99_latency"]
+	v, found = data.mapping["th_p99_latency"]
 	if !found {
 		t.Fatalf("Key 'th_p99_latency' not found")
 	}
 	if v != "{11,21}" {
 		t.Fatalf("th_p99_latency!=11,21; Got: %s", v)
 	}
-	v, found = data.Mapping["th_p999_latency"]
+	v, found = data.mapping["th_p999_latency"]
 	if !found {
 		t.Fatalf("Key 'th_p999_latency' not found")
 	}
 	if v != "{11,21}" {
 		t.Fatalf("th_p999_latency!=11,21; Got: %s", v)
 	}
-	v, found = data.Mapping["th_link_usage"]
+	v, found = data.mapping["th_link_usage"]
 	if !found {
 		t.Fatalf("Key 'th_link_usage' not found")
 	}
