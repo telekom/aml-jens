@@ -90,7 +90,12 @@ func (s *dualWriter) Write(p []byte) (n int, err error) {
 
 func InitLogger(name string) {
 	var err error
-	os.MkdirAll(paths.LOG_PATH(), 0666)
+	err = os.MkdirAll(paths.LOG_PATH(), 0666)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "COULD NOT INIT LOGGER")
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(-1)
+	}
 	if name != "" {
 		program_name = strings.ReplaceAll(name, "/", "_")
 	}
