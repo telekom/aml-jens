@@ -36,6 +36,7 @@ import (
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/assets/paths"
 	"github.com/telekom/aml-jens/internal/config"
+	"github.com/telekom/aml-jens/internal/logging"
 )
 
 const (
@@ -53,6 +54,7 @@ const (
 )
 
 var CFG = config.ShowCfg()
+var DEBUG, INFO, FATAL = logging.GetLogger()
 
 type FlowManager struct {
 	Mutex             sync.Mutex
@@ -216,13 +218,14 @@ func (man *FlowManager) MainSTDinReadLoop(r *bufio.Reader) {
 					man.Handler.OnEndOfDrpplayer()
 					return
 				} else {
-					log.Println(err.Error())
+					FATAL.Println(err.Error())
 					man.ExitApplicationErr("Error while Reading: " + err.Error())
 				}
 
 			}
 			if !man.ReadFromLine(line) { //"End of drplay"
-				man.Handler.OnEndOfDrpplayer()
+				INFO.Println("Something was skipped")
+				//man.Handler.OnEndOfDrpplayer()
 			}
 		}
 	}()
@@ -290,15 +293,20 @@ func (manager *FlowManager) ReadFromLine(line string) bool {
 	parseFloat := func(ln string) float64 {
 		i, err := strconv.ParseFloat(ln, 64)
 		if err != nil {
-			manager.ExitApplicationErr("Invalid Line format. Not a Number.")
+			INFO.Printf("Invalid Line format. Not a Number: %+v", err)
+			return 0
 		}
 		return i
 	}
 	if len(splitData) != len(assets.CONST_HEADING) {
-		log.Printf("Invalid Line format. Wrong length (%d):'%s'\n", len(splitData), line)
-		manager.ExitApplicationErr("Invalid Line format. Wrong length.")
+		INFO.Printf("Invalid Line format. Wrong length (%d):'%s'\n", len(splitData), line)
+		return false
 	}
 	net_data := strings.Split(splitData[i_netw], "-")
+	if len(net_data) != 2 {
+		INFO.Fatalf("Did not find correct flow format: %s", splitData[i_netw])
+		return false
+	}
 	f := NewFlow(
 		net_data[in_src],
 		net_data[in_dst],
@@ -307,6 +315,7 @@ func (manager *FlowManager) ReadFromLine(line string) bool {
 	if !manager.Contains(f) {
 		manager.Append(f)
 	}
+
 	go manager.GetAndAppendTo(f,
 		parseFloat(splitData[i_timestamp]),
 		parseFloat(splitData[i_sojourntime]),
