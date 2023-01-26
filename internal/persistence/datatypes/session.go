@@ -114,7 +114,7 @@ func (s *DB_session) ValidateUniqueName(stmt SQLStmt) error {
 	if exists {
 		INFO.Printf("Tag with name %s already exists\n", s.Name)
 		s.Name = util.IterateTagName(s.Name)
-		s.ValidateUniqueName(stmt)
+		return s.ValidateUniqueName(stmt)
 	}
 	return nil
 }

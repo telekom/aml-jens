@@ -43,6 +43,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
@@ -337,7 +338,10 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 			}
 			persist_samples <- sample
 			if session.ParentBenchmark.PrintToStdOut {
-				sample.PrintLine(aggregated_measure.net_flow.MeasureIdStr())
+				if sample.PrintLine(aggregated_measure.net_flow.MeasureIdStr()) != nil {
+					INFO.Println("Could not write Measurement")
+					syscall.Kill(syscall.Getpid(), syscall.SIGPIPE)
+				}
 			}
 		}
 		if doExit {

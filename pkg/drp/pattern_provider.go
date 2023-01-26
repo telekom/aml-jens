@@ -53,23 +53,19 @@ type DataRatePatternFileProvider struct {
 func NewDataRatePatternFileProvider(path string) *DataRatePatternFileProvider {
 	return &DataRatePatternFileProvider{Path: path}
 }
-func convertDRPdata(strdata *[][]string, scale float64, minrate float64) (drp DataRatePattern, err error) {
-	if scale == 0 {
-		scale = 1
+func convertDRPdata(strdata *[][]string, p struct {
+	MinRateKbits float64
+	Scale        float64
+	Origin       string
+}) (drp DataRatePattern, err error) {
+	if p.Scale == 0 {
+		p.Scale = 1
 	}
 	if len(*strdata) == 0 {
 		return drp,
 			errortypes.NewUserInputError("DRP seems to be invalid. No rows loaded.")
 	}
-	drp.loadParameters = struct {
-		MinRateKbits float64
-		Scale        float64
-		Origin       string
-	}{
-		MinRateKbits: minrate,
-		Scale:        scale,
-		Origin:       "Filesystem",
-	}
+	drp.loadParameters = p
 	drp.Min = math.MaxFloat64
 	drp.Max = -1
 	drp.Avg = 0
@@ -92,8 +88,11 @@ func convertDRPdata(strdata *[][]string, scale float64, minrate float64) (drp Da
 			return drp,
 				errortypes.NewUserInputError("Row %d: '%s' in drp is not a valid float64", i, str[0])
 		}
-		ret[i] = math.Max(float*scale, minrate)
-		binary.Write(&hash_buf, binary.LittleEndian, float)
+		ret[i] = math.Max(float*p.Scale, p.MinRateKbits)
+		err = binary.Write(&hash_buf, binary.LittleEndian, float)
+		if err != nil {
+			return drp, err
+		}
 		if ret[i] > drp.Max {
 			drp.Max = ret[i]
 		}
@@ -125,7 +124,7 @@ func readCSV(path string) (*[][]string, error) {
 }
 
 func readDRPCommentPath(path string, drp *DataRatePattern) (err error) {
-	drp.Mapping = make(map[string]string, 5)
+	drp.mapping = make(map[string]string, 5)
 	var description strings.Builder
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -149,13 +148,19 @@ func readDRPCommentPath(path string, drp *DataRatePattern) (err error) {
 		sep := strings.Split(no_white_space[2:], "=")
 		var_name := sep[0]
 		var_value := sep[1]
-		if strings.HasPrefix(var_name, "th_") && len(sep) != 2 {
-			return fmt.Errorf("error Parsing EvalSetting: '%s'; Not a valid assignment", no_white_space)
+		if strings.HasPrefix(var_name, "th_") {
+			//Format: '{a,b}' | a,b ∈ [0-9]+ //[2]float64
+			if len(sep) != 2 {
+				return fmt.Errorf("error Parsing EvalSetting: '%s'; Not a valid assignment", no_white_space)
+			}
+			/*if var_value[0] != '{' || var_value[len(var_value)-1] != '}' {
+				//TODO: format validation
+			}*/
 		}
 		if !two_values.MatchString(var_value) {
 			INFO.Printf("Ignoring: %s=%s ", var_name, var_value)
 		}
-		drp.Mapping[var_name] = fmt.Sprintf("{%s}", var_value)
+		drp.mapping[var_name] = fmt.Sprintf("{%s}", var_value)
 
 	}
 	drp.Description = description.String()
@@ -172,7 +177,15 @@ func (self *DataRatePatternFileProvider) Provide(scale float64, minrate float64)
 	if err != nil {
 		return ret, err
 	}
-	ret, err = convertDRPdata(strdata, scale, minrate)
+	ret, err = convertDRPdata(strdata, struct {
+		MinRateKbits float64
+		Scale        float64
+		Origin       string
+	}{
+		Scale:        scale,
+		MinRateKbits: minrate,
+		Origin:       self.Path,
+	})
 	if err != nil {
 		return ret, err
 	}

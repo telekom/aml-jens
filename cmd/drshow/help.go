@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -41,6 +41,13 @@ var helpstringMap = map[string]bool{
 	"--HELP": true,
 	"-HELP":  true,
 	"-H":     true,
+}
+var verstionstringMap = map[string]bool{
+	"V":         true,
+	"VERSION":   true,
+	"--VERSION": true,
+	"-VERSION":  true,
+	"-V":        true,
 }
 var ModeStringMap = map[string]helpmode{
 	"PIPE":   mode_str_pipe,

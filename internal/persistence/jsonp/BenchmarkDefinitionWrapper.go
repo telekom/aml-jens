@@ -177,7 +177,9 @@ func LoadDB_benchmarkFromJson(path string) (*datatypes.DB_benchmark, error) {
 		db_drp.Intial_minRateKbits = m
 		db_drp.WarmupTimeMs = w
 
-		db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(v.Path))
+		if err = db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(v.Path)); err != nil {
+			return nil, err
+		}
 		fe, fu, el, l4, ss, qs := ReadTcValuesWithFallbacks(play_cfg.A_Session, v.Setting.TC, defintion.DrplaySetting.TC)
 		benchmark.Sessions[i] = &datatypes.DB_session{
 			Markfree:            fe,
@@ -222,7 +224,10 @@ func (wbcfg *BenchmarkDefinitionWrapper) Validate() error {
 	if len(wbcfg.hash) == 0 {
 		INFO.Println("Benchmark has no hash-value")
 		defer func() {
-			wbcfg.CheckOrCalcHash()
+			err := wbcfg.CheckOrCalcHash()
+			if err != nil {
+				INFO.Println(err)
+			}
 		}()
 
 	} else {
