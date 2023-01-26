@@ -37,7 +37,7 @@ import (
 	"github.com/telekom/aml-jens/internal/logging"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 const CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
 

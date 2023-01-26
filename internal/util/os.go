@@ -27,7 +27,7 @@ import (
 	"github.com/telekom/aml-jens/internal/logging"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func IsDirectory(path string) (bool, error) {
 	fileInfo, err := os.Stat(path)
