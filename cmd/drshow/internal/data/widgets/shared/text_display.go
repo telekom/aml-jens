@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -35,7 +35,7 @@ const UPDATE_TEXT_CLEAR = "\"æ\"\r"
 func NewTextBox(ctx context.Context, t terminalapi.Terminal, updateText <-chan string) (*text.Text, error) {
 	wrapped, err := text.New(text.WrapAtRunes())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	go func() {
@@ -74,7 +74,7 @@ func NewTextWithOptsBoxAppendTopLast2(ctx context.Context, t terminalapi.Termina
 	last := ""
 	wrapped, err := text.New(text.WrapAtRunes())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	go func() {

@@ -24,7 +24,6 @@ package flowdata
 import (
 	"encoding/csv"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -92,7 +91,7 @@ func (self *FlowT) ExportToFile(path string) error {
 
 	file_name := fmt.Sprintf(assets.DRSHOW_EXPORT_PATH_NAME, self.identifier(), time.Now().Round(time.Second).Format("2006-01-02_15-04-05"))
 	file_name, _ = filepath.Abs(filepath.Join(config.ShowCfg().ExportPathPrefix, file_name))
-	log.Printf("Trying to export [%s] to %s\n", self.identifier(), file_name)
+	INFO.Printf("Trying to export [%s] to %s\n", self.identifier(), file_name)
 	var file *os.File
 	var err error
 	if file, err = os.OpenFile(file_name, os.O_CREATE|os.O_WRONLY, 0666); err != nil {
@@ -123,7 +122,7 @@ func (self *FlowT) ExportToFile(path string) error {
 		}
 	}
 	csvWriter.Flush()
-	log.Printf("Done Exporting [%s]\n", self.identifier())
+	INFO.Printf("Done Exporting [%s]\n", self.identifier())
 	return nil
 }
 

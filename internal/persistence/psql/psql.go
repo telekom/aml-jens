@@ -153,7 +153,8 @@ func (s *DataBase) Persist(obj interface{}) error {
 		DEBUG.Printf("{interface {persistence.DumbPersistable}} --> %v", reflect.TypeOf(v))
 		return v.Insert(s.db)
 	default:
-		panic(fmt.Sprintf("unknown Obj-Type: %v (%+v)", reflect.TypeOf(obj), obj))
+		WARN.Printf("unknown Obj-Type: %v (%+v)", reflect.TypeOf(obj), obj)
+		return nil
 	}
 }
 

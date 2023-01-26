@@ -5511,7 +5511,7 @@ def main():
     sleep_amp = 0.1
     if len(sys.argv) == 2:
         try:
-           sleep_amp = float(sys.argv[1])
+            sleep_amp = float(sys.argv[1])
         except ValueError:
             pass
 

@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -22,11 +22,13 @@
 package util
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -107,7 +109,10 @@ func IterateTagName(name string) string {
 		si := split[len(split)-1]
 		i, err := strconv.Atoi(si[:len(si)-1])
 		if err != nil {
-			log.Fatalln("Could not mangle name for unique entry")
+			WARN.Println("Could not mangle name for unique entry")
+			b := make([]byte, 8)
+			binary.LittleEndian.PutUint64(b, uint64(time.Now().Unix()))
+			return name + base64.StdEncoding.EncodeToString(b)
 		}
 		name = fmt.Sprintf("%s(%d)", split[0], i+1)
 	} else {

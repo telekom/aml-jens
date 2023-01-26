@@ -27,12 +27,14 @@ import (
 
 	data "github.com/telekom/aml-jens/cmd/drshow/internal/data/flowdata"
 	"github.com/telekom/aml-jens/internal/config"
+	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/util"
 
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/widgets/linechart"
 )
 
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 var CFG = config.ShowCfg()
 var label_color = cell.ColorWhite
 
@@ -73,7 +75,8 @@ func NewFlowDataLineChartPerc(ctx context.Context, dataIn <-chan data.DisplayDat
 					err = chart.Series(newData.Name, *newData.Data,
 						linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(int(newData.Color)))))
 					if err != nil {
-						panic(err)
+						INFO.Printf("Could not display data on linechart")
+						INFO.Println(err)
 					}
 				}
 
@@ -116,7 +119,8 @@ func NewFlowDataLineChart(ctx context.Context, dataIn <-chan data.DisplayDataT, 
 					err = chart.Series(newData.Name, *newData.Data,
 						linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(int(newData.Color)))))
 					if err != nil {
-						panic("newDataError: " + err.Error())
+						INFO.Printf("Could not display data on linechart")
+						INFO.Println(err)
 					}
 				}
 
@@ -159,12 +163,14 @@ func NewFlowDataLineChartCombinationLoadCapacity(ctx context.Context, dataIn <-c
 					err = chart.Series(newData.Name, *newData.Data,
 						linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(int(newData.Color)))))
 					if err != nil {
-						panic("newDataError: " + err.Error())
+						INFO.Printf("Could not display data on linechart")
+						INFO.Println(err)
 					}
 					err = chart.Series("Linkcapacity", *newData.DataExtra,
 						linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(15))))
 					if err != nil {
-						panic("newDataError: " + err.Error())
+						INFO.Printf("Could not display data on linechart")
+						INFO.Println(err)
 					}
 				}
 
@@ -199,7 +205,7 @@ func NewFlowDataLineChartAbs(ctx context.Context, dataIn <-chan data.DisplayData
 	}
 
 	if err != nil {
-		return nil, err
+		return chart, err
 	}
 
 	go func() {
@@ -210,7 +216,8 @@ func NewFlowDataLineChartAbs(ctx context.Context, dataIn <-chan data.DisplayData
 					err = chart.Series(newData.Name, *newData.Data,
 						linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(int(newData.Color)))))
 					if err != nil {
-						panic("newDataError: " + err.Error())
+						INFO.Printf("Could not display data on linechart")
+						INFO.Println(err)
 					}
 				}
 
@@ -254,7 +261,8 @@ func NewFlowDataLineChartMs(ctx context.Context, dataIn <-chan data.DisplayDataT
 					err = chart.Series(newData.Name, *newData.Data,
 						linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(int(newData.Color)))))
 					if err != nil {
-						panic(err)
+						INFO.Printf("Could not display data on linechart")
+						INFO.Println(err)
 					}
 				}
 

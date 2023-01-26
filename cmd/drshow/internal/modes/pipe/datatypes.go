@@ -52,35 +52,35 @@ type detWids struct {
 	DelayChart   *linechart.LineChart
 }
 
-func NewDetWids(ctx context.Context, c *coms.FlowChannels, flowId int32) detWids {
+func NewDetWids(ctx context.Context, c *coms.FlowChannels, flowId int32) (*detWids, error) {
 	Load, err := flowWidgets.NewFlowDataLineChartCombinationLoadCapacity(ctx, c.UpdateLoad, flowId)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	Ecn, err := flowWidgets.NewFlowDataLineChartPerc(ctx, c.UpdateEcn, flowId)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	Dropp, err := flowWidgets.NewFlowDataLineChartAbs(ctx, c.UpdateDropp, flowId)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	Sojourn, err := flowWidgets.NewFlowDataLineChartMs(ctx, c.UpdateSojourn, flowId)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	Delay, err := flowWidgets.NewFlowDataLineChart(ctx, c.UpdateDelay, flowId)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return detWids{
+	return &detWids{
 		LoadChart:    Load,
 		EcnChart:     Ecn,
 		DroppChart:   Dropp,
 		SojournChart: Sojourn,
 		DelayChart:   Delay,
-	}
+	}, nil
 }
 
 type wids struct {

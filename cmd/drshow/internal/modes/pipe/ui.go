@@ -95,7 +95,13 @@ func NewUI(ctx context.Context, t terminalapi.Terminal, c *container.Container, 
 			case flow := <-C.UpdateDataGraphs:
 				man.Mutex.Lock()
 				if s.M[flow.FlowId] == (detWids{}) {
-					s.M[flow.FlowId] = NewDetWids(ctx, C, flow.FlowId)
+					detWid, err := NewDetWids(ctx, C, flow.FlowId)
+					if err != nil {
+						WARN.Println(err)
+						continue
+					} else {
+						s.M[flow.FlowId] = *detWid
+					}
 				}
 				C.UpdateLoad <- flowdata.DisplayDataDualT{Name: fmt.Sprint(flow.FlowId), FlowId: flow.FlowId, Data: flow.D.Load, Color: flow.Color(), DataExtra: flow.D.Capacity}
 				C.UpdateDelay <- flowdata.DisplayDataT{Name: fmt.Sprint(flow.FlowId), FlowId: flow.FlowId, Data: flow.D.Delay, Color: flow.Color()}

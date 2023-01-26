@@ -38,17 +38,16 @@ import (
 func NewFlowListTextBox(ctx context.Context, t terminalapi.Terminal, updateFlows <-chan *flowdata.FlowManager) (*text.Text, error) {
 	wrapped, err := text.New()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if err := wrapped.Write("Waiting for Flows", text.WriteCellOpts(cell.FgColor(cell.ColorRed))); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	const ROW_COUNT int = 6
 	go func() {
 		var lastUpdate = time.Now()
 		for {
-			//+ writeBlinkingOptIf(bSelectedFlow, "■", text.WriteCellOpts(cell.FgColor(cell.ColorNumber(int(flow.ColorI)))))
 			select {
 			case man := <-updateFlows:
 				if time.Now().Sub(lastUpdate) < time.Second {
@@ -60,7 +59,6 @@ func NewFlowListTextBox(ctx context.Context, t terminalapi.Terminal, updateFlows
 				if len(absoluteIndexes)%ROW_COUNT != 0 {
 					col_count++
 				}
-				//panic(fmt.Sprintf("RowCount=%d, ColCount=%f"))
 
 				colC, rowC, dataTablePtr := convertFlowsTo2dArray(eligableFlows, ROW_COUNT)
 				if dataTablePtr == nil {
@@ -76,7 +74,6 @@ func NewFlowListTextBox(ctx context.Context, t terminalapi.Terminal, updateFlows
 }
 func writeHighlightedIf(wrapped *text.Text, b bool, t string) error {
 	if b {
-
 		return wrapped.Write(t, text.WriteCellOpts(cell.BgColor(cell.ColorBlack), cell.Bold()))
 	} else {
 		return wrapped.Write(t)
@@ -84,7 +81,6 @@ func writeHighlightedIf(wrapped *text.Text, b bool, t string) error {
 }
 func writeHiglightedColoredIf(wrapped *text.Text, b bool, t string, color uint8) error {
 	if b {
-
 		return wrapped.Write(t, text.WriteCellOpts(cell.BgColor(cell.ColorBlack), cell.Bold(), cell.FgColor(cell.ColorNumber(int(color)))))
 	} else {
 		return wrapped.Write(t)
@@ -107,27 +103,30 @@ func print2dArrayOfFlows(wrapped *text.Text, dataTable *[][]*flowdata.FlowT, row
 				isSelectedFlow,
 				fmt.Sprintf("%04d", flow.FlowId),
 			); err != nil {
-				panic(err)
+				WARN.Printf("Could not write colored: %v", err)
 			}
-			writeHiglightedColoredIf(wrapped, isSelectedFlow,
+			if err := writeHiglightedColoredIf(wrapped, isSelectedFlow,
 				"(",
 				flow.Color(),
-			)
-			writeHighlightedIf(wrapped, isSelectedFlow,
-				fmt.Sprintf("% 5s", util.FormatLabelISOShorter(float64(flow.D.Length()))))
-			writeHiglightedColoredIf(wrapped, isSelectedFlow,
+			); err != nil {
+				WARN.Printf("Could not write colored: %v", err)
+			}
+			if err := writeHighlightedIf(wrapped, isSelectedFlow,
+				fmt.Sprintf("% 5s", util.FormatLabelISOShorter(float64(flow.D.Length())))); err != nil {
+				WARN.Printf("Could not write colored: %v", err)
+			}
+			if err := writeHiglightedColoredIf(wrapped, isSelectedFlow,
 				")",
 				flow.Color(),
-			)
+			); err != nil {
+				WARN.Printf("Could not write colored: %v", err)
+			}
 			if err := wrapped.Write("▍",
 				text.WriteCellOpts(cell.FgColor(cell.ColorNumber(int(flow.Color()))))); err != nil {
-				panic(err)
+				WARN.Printf("Could not write colored: %v", err)
 			}
-			/*if err := wrapped.Write("⎸"); err != nil {
-				panic(err)
-			}*/
 		}
-	} //tc qdisc delete dev lo parent 1:1
+	}
 
 	for line := 0; line < rowC; line++ {
 		writeLine(line, dataTable)
