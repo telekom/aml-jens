@@ -77,7 +77,7 @@ func postTest(t *testing.T, path string) {
 }
 func TestGetLoggerFileCreation(t *testing.T) {
 	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
-	postTest(t, log_path)
+	logging.InitLogger("TESTING")
 	defer postTest(t, log_path)
 	_, _, _ = logging.GetLogger()
 	log_file_exists, err := doesFileExists(log_path)
@@ -85,6 +85,6 @@ func TestGetLoggerFileCreation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !log_file_exists {
-		//t.Fatalf("Logging path '%s' was not created", log_path)
+		t.Fatalf("Logging path '%s' was not created", log_path)
 	}
 }
