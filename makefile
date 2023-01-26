@@ -1,13 +1,13 @@
 TEST_DATA_DIR="./test/testdata"
-VERSION ?= "00.00-99"
-
+VERSION ?= "-dev-00.00-99"
+LD_FLAGS = "-X 'github.com/telekom/aml-jens/internal/assets.VERSION=$(VERSION)' -X 'github.com/telekom/aml-jens/internal/assets.BUILD_TIME=$(shell date --iso-8601=seconds)'"
 .PHONY: clean-binaries clean-packages test package help build-binaries coverage
 all: help
 
 build-binaries: # Build executables under cmd/*
 build-binaries: clean-binaries
 	@echo Building executables
-	@go build -v -o ./bin/ ./cmd/*
+	@go build -v -ldflags=${LD_FLAGS} -o ./bin/ ./cmd/*
 	@chmod +x ./bin/*
 clean-binaries:
 	@rm -rf ./bin/*

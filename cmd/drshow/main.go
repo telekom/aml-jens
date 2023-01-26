@@ -51,7 +51,8 @@ func parseArgs(res *string) (mode, error) {
 	if Nargs == 0 {
 		return mode_pipe, nil
 	}
-	first_arg_is_help := helpstringMap[strings.ToUpper(os.Args[1])]
+	upper_arg := strings.ToUpper(os.Args[1])
+	first_arg_is_help := helpstringMap[upper_arg]
 	if Nargs > 2 {
 		return mode_err, errors.New("invalid Arguments. See man pages or drshow --help for more info")
 	}
@@ -61,12 +62,18 @@ func parseArgs(res *string) (mode, error) {
 		INFO.Println("Displaying help: " + *res)
 		return mode_help, nil
 	}
+	if verstionstringMap[upper_arg] {
+		fmt.Printf("Version      : %s\n", assets.VERSION)
+		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
+		os.Exit(0)
+	}
 	*res = os.Args[Nargs]
 	return mode_static, nil
 }
 
 func main() {
 	logging.InitLogger(assets.NAME_DRSHOW)
+	logging.EnableDebug()
 	var ErrorOrNil error = nil
 	var path string
 
