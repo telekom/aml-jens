@@ -27,25 +27,23 @@ import (
 )
 
 type DataRatePatternIterator struct {
-	position int
 	looping  bool
 	operator int
 	data     *[]float64
-	i        int
+	position int
 	value    float64
 }
 
 func NewDataRatePatternIterator() *DataRatePatternIterator {
 	return &DataRatePatternIterator{
-		position: 0,
 		looping:  false,
 		operator: +1,
-		i:        -1,
+		position: -1,
 	}
 }
 func (s *DataRatePatternIterator) UpdateAndReset(drp *[]float64) {
 	s.data = drp
-	s.i = -1
+	s.position = -1
 	s.value = (*drp)[0]
 }
 func (s *DataRatePatternIterator) Value() float64 {
@@ -53,11 +51,10 @@ func (s *DataRatePatternIterator) Value() float64 {
 }
 func (s *DataRatePatternIterator) Next() (float64, error) {
 	switch max_i := len(*s.data); {
-	case s.i == -1:
-		s.i += s.operator * 2
-		break
-	case s.i >= max_i || s.i <= 0:
-		at_max := s.i >= max_i
+	case s.position == -1:
+		s.position += s.operator * 2
+	case s.position >= max_i || s.position <= 0:
+		at_max := s.position >= max_i
 		//We are at the end of a cycle
 		if !s.looping {
 			return 0, &errortypes.IterableStopError{}
@@ -66,16 +63,16 @@ func (s *DataRatePatternIterator) Next() (float64, error) {
 		s.operator *= -1
 		if at_max {
 			//double last value and continue at last -1
-			s.i += s.operator * 2
+			s.position += s.operator * 2
 		} else /* at_min*/ {
 			//start back up at 0- doubling it
-			s.i = -1
+			s.position = -1
 			s.value = (*s.data)[0]
 		}
 
 	default:
-		s.i += s.operator
-		index := util.MinInt(max_i-1, util.AbsInt(s.i-s.operator))
+		s.position += s.operator
+		index := util.MinInt(max_i-1, util.AbsInt(s.position-s.operator))
 		s.value = (*s.data)[index]
 	}
 	return s.value, nil

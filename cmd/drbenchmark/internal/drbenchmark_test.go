@@ -167,7 +167,11 @@ func verifySession(t *testing.T, prefix string, got *datatypes.DB_session, e ses
 
 func TestReadBenchmarkFromFileConfigFallback(t *testing.T) {
 	viper.AddConfigPath(utiltest.TEST_CONFIG_PATH)
-	persistence.SetPersistenceTo(&mock.Database{}, &datatypes.Login{})
+	err := persistence.SetPersistenceTo(&mock.Database{}, &datatypes.Login{})
+	if err != nil {
+		t.Log(err)
+		t.SkipNow()
+	}
 	bm, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_FallbackConfig))
 	if err != nil {
 		t.Fatalf("Could not load valid Benchmark: %s", err)
@@ -195,7 +199,11 @@ func TestReadBenchmarkFromFileConfigFallback(t *testing.T) {
 
 func TestReadBenchmarkFromFileAllSettingsInner(t *testing.T) {
 	viper.AddConfigPath(utiltest.TEST_CONFIG_PATH)
-	persistence.SetPersistenceTo(&mock.Database{}, nil)
+	err := persistence.SetPersistenceTo(&mock.Database{}, nil)
+	if err != nil {
+		t.Log(err)
+		t.SkipNow()
+	}
 	bm, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_NoIndividualSet))
 	if err != nil {
 		t.Fatal(err)
@@ -235,7 +243,11 @@ func TestReadBenchmarkFromFileAllSettingsInner(t *testing.T) {
 }
 func TestReadBenchmarkFromFileAllSettingsPattern(t *testing.T) {
 	viper.AddConfigPath(utiltest.TEST_CONFIG_PATH)
-	persistence.SetPersistenceTo(&mock.Database{}, nil)
+	err := persistence.SetPersistenceTo(&mock.Database{}, nil)
+	if err != nil {
+		t.Log(err)
+		t.SkipNow()
+	}
 	bm, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_AllIndividualsSet))
 	if err != nil {
 		t.Fatal(err)

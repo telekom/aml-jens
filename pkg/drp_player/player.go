@@ -51,26 +51,32 @@ func StartDrpPlayer(session *datatypes.DB_session) {
 		FATAL.Exit(err)
 	}
 	wg.Add(1)
-	go TC.LaunchChangeLoop(
-		time.Duration(1000/session.ChildDRP.Freq)*time.Millisecond,
-		&wg,
-		session.ChildDRP,
-	)
+	go func() {
+		err := TC.LaunchChangeLoop(
+			time.Duration(1000/session.ChildDRP.Freq)*time.Millisecond,
+			&wg,
+			session.ChildDRP,
+		)
+		if err != nil {
+			FATAL.Println(err)
+		}
+	}()
 
 	DEBUG.Println("... in background")
-
+	done := registerExitHandler(&wg, exit_handler_channel, session, TC)
 	// start measure session
 	if !session.ChildDRP.Nomeasure {
 		go measuresession.Start(session, TC, g_channel_exit)
 	}
-
-	done := registerExitHandler(&wg, exit_handler_channel, session, TC)
-
+	INFO.Println("[][][][][][][][] Waiting")
 	wg.Wait()
 	exit_handler_channel <- syscall.SIGQUIT
+	INFO.Println("[][][][][][][][] Sending quit")
 	measuresession.WaitGroup.Wait()
+	INFO.Println("[][][][][][][][] Waiting 2.")
 	//Wait for ExitHandler
 	<-done
+	INFO.Println("[][][][][][][][] DONE")
 	INFO.Println(strings.Join(assets.END_OF_DRPLAY[:], " "))
 }
 

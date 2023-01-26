@@ -172,7 +172,6 @@ func (c *config) setToDefaults() {
 			},
 		},
 	}
-	return
 }
 
 func cfgIntDefault(key string, def int) int {

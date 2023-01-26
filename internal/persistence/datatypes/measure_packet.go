@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -61,6 +61,7 @@ func (s *DB_measure_packet) CsvRecord() []string {
 }
 
 //go:inline
-func (s *DB_measure_packet) PrintLine(netflow string) {
-	fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, netflow)
+func (s *DB_measure_packet) PrintLine(netflow string) error {
+	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, netflow)
+	return err
 }
