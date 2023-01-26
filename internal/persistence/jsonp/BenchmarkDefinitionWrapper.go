@@ -36,7 +36,7 @@ import (
 	"github.com/telekom/aml-jens/pkg/drp"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type BenchmarkDefinitionWrapper struct {
 	hash    []byte

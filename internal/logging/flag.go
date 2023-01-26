@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -27,7 +27,7 @@ import (
 	"os"
 )
 
-var DEBUG, INFO, FATAL = GetLogger()
+var DEBUG, INFO, WARN, FATAL = GetLogger()
 
 func FlagParseExit(msg string, a ...any) {
 	INFO.Printf(msg, a...)

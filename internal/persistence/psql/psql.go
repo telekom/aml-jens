@@ -35,7 +35,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DataBase struct {
 	db                     *sql.DB

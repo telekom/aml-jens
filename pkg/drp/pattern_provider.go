@@ -40,7 +40,7 @@ import (
 	"github.com/telekom/aml-jens/internal/util"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DataRatePatternProvider interface {
 	Provide(scale float64, minrate float64) (DataRatePattern, error)
