@@ -32,12 +32,15 @@ import (
 )
 
 func TestGetLoggerPrefix(t *testing.T) {
-	DEBUG, INFO, FATAL := logging.GetLogger()
+	DEBUG, INFO, WARN, FATAL := logging.GetLogger()
 	if DEBUG.Prefix() != "[DEBUG] " {
 		t.Fatalf("DebugPrefix was not set correctly. '%s'", DEBUG.Prefix())
 	}
 	if INFO.Prefix() != "[INFO] " {
 		t.Fatalf("InfoPrefix was not set correctly. '%s'", INFO.Prefix())
+	}
+	if WARN.Prefix() != "[WARN] " {
+		t.Fatalf("InfoPrefix was not set correctly. '%s'", WARN.Prefix())
 	}
 	if FATAL.Prefix() != "[FATAL] " {
 		t.Fatalf("InfoPrefix was not set correctly. '%s'", FATAL.Prefix())
@@ -45,13 +48,16 @@ func TestGetLoggerPrefix(t *testing.T) {
 
 }
 func TestGetLoggerSingelton(t *testing.T) {
-	_, INFOa, FATALa := logging.GetLogger()
-	_, INFOb, FATALb := logging.GetLogger()
+	_, INFOa, WARNa, FATALa := logging.GetLogger()
+	_, INFOb, WARNb, FATALb := logging.GetLogger()
 	if INFOa != INFOb {
 		t.Fatal("Info Logger did not use singelton")
 	}
+	if WARNa != WARNb {
+		t.Fatal("Warn Logger did not use singelton")
+	}
 	if FATALa != FATALb {
-		t.Fatal("Info Logger did not use singelton")
+		t.Fatal("Fatal Logger did not use singelton")
 	}
 
 }
@@ -79,7 +85,7 @@ func TestGetLoggerFileCreation(t *testing.T) {
 	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
 	logging.InitLogger("TESTING")
 	defer postTest(t, log_path)
-	_, _, _ = logging.GetLogger()
+	_, _, _, _ = logging.GetLogger()
 	log_file_exists, err := doesFileExists(log_path)
 	if err != nil {
 		t.Fatal(err)

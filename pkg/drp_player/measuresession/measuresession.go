@@ -53,7 +53,7 @@ import (
 	"github.com/telekom/aml-jens/pkg/drp_player/trafficcontrol"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DB_measure_packet = datatypes.DB_measure_packet
 type DB_network_flow = datatypes.DB_network_flow

@@ -29,7 +29,7 @@ import (
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type Persistence interface {
 	Init(login *datatypes.Login) error

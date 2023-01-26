@@ -52,6 +52,7 @@ type LoggerType interface {
 var (
 	singelton_debug_logger *rlog.Logger = nil
 	singelton_info_logger  *rlog.Logger = nil
+	singelton_warn_logger  *rlog.Logger = nil
 	singelton_fatal_logger LoggerType   = nil
 	program_name           string       = "dr"
 	fp                     *os.File     = nil
@@ -109,6 +110,7 @@ func InitLogger(name string) {
 		os.Exit(-1)
 	}
 	singelton_info_logger.SetOutput(fp)
+	singelton_warn_logger.SetOutput(fp)
 	singelton_fatal_logger.SetOutput(NewDualWriter(fp, os.Stderr))
 }
 func EnableDebug() {
@@ -121,11 +123,12 @@ func LinkExitFunction(exit func() uint8, timeoutMs int) {
 		rlog.Default().Fatal("Cant set Exit funtion on not set Logger")
 	}
 }
-func GetLogger() (debug *rlog.Logger, info *rlog.Logger, fatal LoggerType) {
+func GetLogger() (debug *rlog.Logger, info *rlog.Logger, warn *rlog.Logger, fatal LoggerType) {
 	if singelton_fatal_logger == nil || singelton_info_logger == nil {
 		singelton_debug_logger = (rlog.New(io.Discard, assets.LOG_PRE_DEBUG, assets.LOG_SETTING))
 		singelton_info_logger = (rlog.New(os.Stderr, assets.LOG_PRE_INFO, assets.LOG_SETTING))
 		singelton_fatal_logger = NewCustomLogger(rlog.New(os.Stderr, assets.LOG_PRE_FATAL, assets.LOG_SETTING))
+		singelton_warn_logger = (rlog.New(os.Stderr, assets.LOG_PRE_WARN, assets.LOG_SETTING))
 	}
-	return singelton_debug_logger, singelton_info_logger, singelton_fatal_logger
+	return singelton_debug_logger, singelton_info_logger, singelton_warn_logger, singelton_fatal_logger
 }

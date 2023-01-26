@@ -29,6 +29,7 @@ const (
 	NAME_DRBENCH  = "DrBenchmark"
 	LOG_PRE_DEBUG = "[DEBUG] "
 	LOG_PRE_INFO  = "[INFO] "
+	LOG_PRE_WARN  = "[WARN] "
 	LOG_PRE_FATAL = "[FATAL] "
 	LOG_SETTING   = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile | log.Lmsgprefix
 )

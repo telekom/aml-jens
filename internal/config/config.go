@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 // Modifies c.player and c.shower
 func (c *config) setDefaults() {

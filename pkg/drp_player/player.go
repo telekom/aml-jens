@@ -20,7 +20,7 @@ import (
 const CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
 
 var g_channel_exit = make(chan struct{})
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func StartDrpPlayer(session *datatypes.DB_session) {
 	exit_handler_channel := make(chan os.Signal, 1)

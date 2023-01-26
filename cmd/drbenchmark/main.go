@@ -41,7 +41,7 @@ import (
 	"github.com/telekom/aml-jens/internal/persistence/psql"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func ArgParse() (*datatypes.DB_benchmark, error) {
 	var dev string = ""

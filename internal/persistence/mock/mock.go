@@ -30,7 +30,7 @@ import (
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
 )
 
-var DEBUG, _, _ = logging.GetLogger()
+var DEBUG, _, _, _ = logging.GetLogger()
 
 type Database struct {
 	knownFlowsByMeasure_ID map[string]int

@@ -29,7 +29,7 @@ import (
 	"github.com/telekom/aml-jens/internal/logging"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 // ExecReturnOutput executes 'name' with args
 // returns its output in string-form.
