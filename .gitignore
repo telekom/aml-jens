@@ -31,3 +31,4 @@ go.work
 
 # Generated debian packages
 *.deb
+deployments/_build/*
