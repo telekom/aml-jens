@@ -47,6 +47,7 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	var dev string = ""
 	var benchmark string = ""
 	var tag string = ""
+	version := flag.Bool("v", false, "prints build version")
 	flag.StringVar(&dev, "dev", "",
 		"nic to play data rate pattern on, default 'lo'")
 	flag.StringVar(&benchmark, "benchmark", "/etc/jens-cli/benchmark_example.json",
@@ -54,7 +55,11 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	flag.StringVar(&tag, "tag", "<interactive>",
 		"name for the benchmark in DB.\nConvention: <algorithm> - L4S: <true/false>")
 	flag.Parse()
-
+	if *version {
+		fmt.Printf("Version      : %s\n", assets.VERSION)
+		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
+		os.Exit(0)
+	}
 	if len(flag.Args()) > 0 {
 		logging.FlagParseExit("Unexpected Argument(s): '%v'", flag.Args())
 	}

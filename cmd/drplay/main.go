@@ -23,6 +23,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
@@ -42,6 +44,7 @@ func ArgParse() (err error) {
 	result := config.PlayCfg().A_Session
 	var looping bool
 	// parse parameters
+	version := flag.Bool("v", false, "prints build version")
 	flag.StringVar(
 		&(result.Dev),
 		"dev",
@@ -93,6 +96,11 @@ func ArgParse() (err error) {
 		"only play drp, no queue measures are recorded")
 
 	flag.Parse()
+	if *version {
+		fmt.Printf("Version      : %s\n", assets.VERSION)
+		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
+		os.Exit(0)
+	}
 	if result.Dev == "" {
 		logging.FlagParseExit("Flag: 'dev' was not set")
 	}
