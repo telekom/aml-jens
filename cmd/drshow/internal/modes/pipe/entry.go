@@ -50,7 +50,7 @@ var fromError = func(e error) (uint8, string) {
 	INFO.Println(e.Error())
 	return 255, e.Error()
 }
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func Run() (uint8, string) {
 
@@ -93,7 +93,7 @@ func Run() (uint8, string) {
 			C.UpdateFlowList <- man
 			flow, err := man.GetSelectedFlow()
 			if err != nil {
-				panic("Can get Selected Flow from Manger: " + err.Error())
+				WARN.Printf("Can get Selected Flow from Manger: %+v", err)
 			}
 			C.UpdateFlowDetails <- flow
 			return nil
@@ -150,12 +150,6 @@ func Run() (uint8, string) {
 		return fromError(err)
 	}
 
-	/*
-		gridOpts, err := ui.Layout(LayoutCombined) // equivalent to contLayout(w)
-		if err != nil {
-			panic(err)
-		}
-	*/
 	if err := setLayout(ctx, t, c, manager, ui, -1, C); err != nil {
 		manager.ExitApplicationErr(err.Error())
 	}

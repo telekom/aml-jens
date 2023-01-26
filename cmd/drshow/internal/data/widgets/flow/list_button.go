@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -69,10 +69,11 @@ const (
 )
 
 func NewFlowListButton(ctx context.Context, t terminalapi.Terminal, typ FlowListButtonSettings, cb button.CallbackFn) (*button.Button, error) {
-
-	btn, err := button.New(typ.Title, cb, button.DisableShadow(), button.Height(1), button.TextColor(cell.ColorNumber(int(typ.ColorNbr))))
-	if err != nil {
-		panic(err)
-	}
-	return btn, nil
+	return button.New(
+		typ.Title,
+		cb,
+		button.DisableShadow(),
+		button.Height(1),
+		button.TextColor(cell.ColorNumber(int(typ.ColorNbr))),
+	)
 }

@@ -50,7 +50,8 @@ func NewPatternLineChart(ctx context.Context, updater *channel.DrpChannels) (*li
 			case drp := <-updater.UpdateDrpPattern:
 				err = chart.Series(drp.Name, *drp.GetData(), linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))))
 				if err != nil {
-					panic(err)
+					WARN.Println("Could not update Series")
+					WARN.Println(err)
 				}
 
 			case <-ctx.Done():
@@ -72,8 +73,5 @@ func NewStaticPatternLineChart(ctx context.Context, drp *data.DataRatePattern) (
 		return nil, err
 	}
 	err = chart.Series(drp.Name, *drp.GetData(), linechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(33))))
-	if err != nil {
-		panic(err)
-	}
-	return chart, nil
+	return chart, err
 }

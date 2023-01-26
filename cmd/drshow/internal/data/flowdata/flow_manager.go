@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -54,7 +53,7 @@ const (
 )
 
 var CFG = config.ShowCfg()
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type FlowManager struct {
 	Mutex             sync.Mutex
@@ -214,7 +213,7 @@ func (man *FlowManager) MainSTDinReadLoop(r *bufio.Reader) {
 			line = strings.TrimSuffix(line, "\n")
 			if err != nil {
 				if err == io.EOF {
-					log.Println("EOF found while reading from STDIN")
+					INFO.Println("EOF found while reading from STDIN")
 					man.Handler.OnEndOfDrpplayer()
 					return
 				} else {
@@ -243,13 +242,12 @@ func ValidateDrpPlayerPipedIn() (*bufio.Reader, bool) {
 	case lines := <-input_skipped:
 		if lines != nil {
 			for _, v := range *lines {
-				log.Fatal(v)
+				WARN.Println(v)
 			}
 		}
 		return r, lines == nil
 	case <-time.After(time.Duration(CFG.WaitTimeForSamplesInSec) * time.Second):
-		log.Printf("No input recieved from stdin after %d seconds. This can be increased in the config file (%s).", CFG.WaitTimeForSamplesInSec, paths.RELEASE_CFG_PATH()+assets.CFG_FILE_NAME)
-		log.New(os.Stderr, "", 0).Fatalf("No input recieved from stdin after %d seconds.", CFG.WaitTimeForSamplesInSec)
+		FATAL.Exit("No input recieved from stdin after %d seconds. This can be increased in the config file (%s).", CFG.WaitTimeForSamplesInSec, paths.RELEASE_CFG_PATH()+assets.CFG_FILE_NAME)
 		return nil, false
 	}
 }
@@ -261,12 +259,12 @@ func skipToMeasures(r *bufio.Reader, c chan *[]string) {
 		lines = append(lines, line)
 		//log.Printf("(%s)\n", line)
 		if err == io.EOF {
-			log.Print("EOF recieved, maybe nothing was piped in?")
+			INFO.Print("EOF recieved, maybe nothing was piped in?")
 			c <- &lines
 			return
 		}
 		if isMagicHeader(strings.Fields(line)) {
-			log.Println("Magic Header found. Listening for samples now.")
+			DEBUG.Println("Magic Header found. Listening for samples now.")
 			c <- nil
 			break
 		}
