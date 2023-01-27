@@ -104,6 +104,8 @@ NOTE:
 Depending on windowsize the size of the graphs might change. 
 	If the height of the graphs is to small: Change fontsize/zoom out of terminal.
 Depending on the terminal the colors might not be accurate.
+Incase of a fatal crash the terminalwindow might be in a not sane state.
+	To fix this, usually, the 'reset' command can reset the current terminal.
 `)
 	case string(mode_str_static):
 		fmt.Fprintf(os.Stdout, `usage: drshow || in static-mode
@@ -113,7 +115,7 @@ DRP will be put into a list.
 
 In App behavior:
 	This list is navigable using ArrowUp and ArrowDown.
-	Using the mouse a portion of the graph can be zoomed in / selected.
+	Using the mouse: a portion of the graph can be zoomed in / selected.
 	Exit Using Esc, 'q' or Ctrl-C
 `)
 	default: // Generic

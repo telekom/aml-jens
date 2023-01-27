@@ -340,7 +340,7 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 			if session.ParentBenchmark.PrintToStdOut {
 				if sample.PrintLine(aggregated_measure.net_flow.MeasureIdStr()) != nil {
 					INFO.Println("Could not write Measurement")
-					syscall.Kill(syscall.Getpid(), syscall.SIGPIPE)
+					_ = syscall.Kill(syscall.Getpid(), syscall.SIGPIPE)
 				}
 			}
 		}

@@ -123,7 +123,6 @@ func askTag() (string, error) {
 }
 func main() {
 	logging.InitLogger(assets.NAME_DRBENCH)
-	logging.EnableDebug()
 	bm, err := ArgParse()
 	if err != nil {
 		FATAL.Exit(err)

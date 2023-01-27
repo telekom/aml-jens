@@ -140,9 +140,9 @@ func (s *DataBase) Persist(obj interface{}) error {
 	}
 	switch v := obj.(type) {
 	case datatypes.DB_measure_packet:
-		return s.MeasurePacket(v)
+		return s.persist_measure_packet(v)
 	case *datatypes.DB_measure_queue:
-		return s.MeasureQueue(v)
+		return s.persist_measurequeue(v)
 	case *datatypes.DB_network_flow:
 		if err := s.persist_flow(v); err != nil {
 			return fmt.Errorf("Persist(datatypes.DB_network_flow)%v", err)
@@ -158,46 +158,58 @@ func (s *DataBase) Persist(obj interface{}) error {
 	}
 }
 
+// Persist a object of type datatypes.DB_measure_packet
+//
 //go:inline
-func (s *DataBase) MeasurePacket(data datatypes.DB_measure_packet) error {
+func (s *DataBase) persist_measure_packet(data datatypes.DB_measure_packet) error {
 
 	if data.Fk_flow_id == -1 {
-		FATAL.Exit("Go a MP without flow assigned")
+		return errors.New("Trying to persist a meausre_packet without its Fk_flow_id set.")
 	}
 	if data.Capacitykbits == 0 {
-		INFO.Println("Not persisting, capacity = 0")
-		return nil
 		//Do not persist samples where capacity is 0
 		//This should only happen during warmup
+		INFO.Println("Not persisting, capacity = 0")
+		return nil
 	}
 	_, err := s.stmt_packet.Exec(data.GetSQLArgs()...)
-	if err != nil {
-		INFO.Printf("MP: %+v -> %v\n", data, err)
-	}
 	return err
 }
 
+// Persist a object of type datatypes.DB_measure_queue
+//
 //go:inline
-func (s *DataBase) MeasureQueue(data *datatypes.DB_measure_queue) error {
+func (s *DataBase) persist_measurequeue(data *datatypes.DB_measure_queue) error {
 	_, err := s.stmt_queue.Exec(data.GetSQLArgs()...)
 	return err
 }
+
+// Call commit on all pending transactions.
+// Will also reopen transactions.
+// And reinstate prepare statments.
+//
+// ! Errors will be logged.
+//
+//go:inline
 func (s *DataBase) Commit() {
 	go func(self *DataBase) {
 		var err error
 		self.txMqMutex.Lock()
 		//DEBUG.Println("Committing txMQ")
 		if err := self.txMQ.Commit(); err != nil {
-			FATAL.Exit(err)
+			FATAL.Println(err)
+			FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
 		}
 		self.txMQ, err = self.db.Begin()
 		if err != nil {
-			FATAL.Printf("Error while MQ.commit: %s", err)
+			FATAL.Println(err)
+			FATAL.Exit("Could not create transaction of measure_queue: check logs / db")
 		}
 		self.stmt_queue, err = self.txMQ.Prepare(datatypes.DB_measure_queue{}.GetSQLStatement())
 		self.txMqMutex.Unlock()
 		if err != nil {
-			FATAL.Exit(err)
+			FATAL.Println(err)
+			FATAL.Exit("Could not prepare preparedstatments of measure_queue: check logs / db")
 		}
 	}(s)
 	go func(self *DataBase) {
@@ -205,16 +217,19 @@ func (s *DataBase) Commit() {
 		self.txMpMutex.Lock()
 		//DEBUG.Println("Committing txMP")
 		if err := self.txMP.Commit(); err != nil {
-			FATAL.Exit(err)
+			FATAL.Println(err)
+			FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
 		}
 		self.txMP, err = self.db.Begin()
 		if err != nil {
-			FATAL.Printf("Error while MP.commit: %s", err)
+			FATAL.Println(err)
+			FATAL.Exit("Could not create transaction of measure_packet: check logs / db")
 		}
 		self.stmt_packet, err = self.txMP.Prepare(datatypes.DB_measure_packet{}.GetSQLStatement())
 		self.txMpMutex.Unlock()
 		if err != nil {
-			FATAL.Exit(err)
+			FATAL.Println(err)
+			FATAL.Exit("Could not prepare preparedstatments of measure_packet: check logs / db")
 		}
 	}(s)
 }

@@ -32,10 +32,12 @@ import (
 	"unicode"
 )
 
+// Format a number that already contains 1000*
 func FormatLabelISOKilo(nbr float64) string {
 	return FormatLabelISO(nbr * 1000)
 }
 func formatLabelISO(nbr float64, formatter func(float64, string) string) string {
+	//There might be more elegeant solutions.
 	if nbr > 1000 {
 		if nbr >= 1000000 {
 			if nbr >= 1000000000 {
@@ -70,6 +72,8 @@ func formatLabelISO(nbr float64, formatter func(float64, string) string) string 
 	}
 	return formatter(nbr, "")
 }
+
+// Format float64 to a ISO labeld nubmer with max 2 decimals
 func FormatLabelISO(nbr float64) string {
 	noTrailingZeros := func(i float64, s string) string {
 		if i == float64(int64(i)) { //no decimals
@@ -80,6 +84,8 @@ func FormatLabelISO(nbr float64) string {
 	}
 	return formatLabelISO(nbr, noTrailingZeros)
 }
+
+// Format float64 to a ISO labeld nubmer with max 1 decimal
 func FormatLabelISOShorter(nbr float64) string {
 	noTrailingZeros := func(i float64, s string) string {
 		if i == float64(int64(i)) { //no decimals
@@ -92,6 +98,7 @@ func FormatLabelISOShorter(nbr float64) string {
 }
 
 func RemoveWhiteSpace(str string) string {
+	// TODO: Can potentially replaced by strings.removeall
 	var b strings.Builder
 	b.Grow(len(str))
 	for _, ch := range str {
@@ -102,6 +109,9 @@ func RemoveWhiteSpace(str string) string {
 	return b.String()
 }
 
+// Iterate a name, adding (number) to it.
+// Increment (number) if already has suffix.
+// If it cant increment: returns 'random' base64 string
 func IterateTagName(name string) string {
 	match, _ := regexp.MatchString(".*\\([0-9]+\\)", name)
 	if match {

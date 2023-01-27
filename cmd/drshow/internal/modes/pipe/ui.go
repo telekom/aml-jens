@@ -144,13 +144,6 @@ type _heightConfig struct {
 	bottomSubParts [4]int
 }
 
-func (h *_heightConfig) str() string {
-	return fmt.Sprintf("\ntopPart:%d\nbotPart:%d\n\t%v", h.topPart, h.bottomPart, h.bottomSubParts)
-}
-func (h *_heightConfig) equals(other _heightConfig) bool {
-	return h.topPart == other.topPart && h.bottomPart == other.bottomPart
-}
-
 func plotHeights(height int) _heightConfig {
 	//log.Printf("Redrawing in terminal of size %dx%d", t.Size().X, t.Size().Y)
 	const TOP_HEIGHT int = 9

@@ -53,11 +53,11 @@ func NewDrpListTextBox(ctx context.Context, t terminalapi.Terminal, up *channel.
 					opts := defaultOpts
 					if i == event.Selected {
 						opts = selectedOpts
-						wrapped.Write(">", text.WriteCellOpts(cell.Blink()))
+						_ = wrapped.Write(">", text.WriteCellOpts(cell.Blink()))
 					} else {
-						wrapped.Write(">")
+						_ = wrapped.Write(">")
 					}
-					wrapped.Write(fmt.Sprintf("  %s\n", drp.Name), opts)
+					_ = wrapped.Write(fmt.Sprintf("  %s\n", drp.Name), opts)
 				}
 			case <-ctx.Done():
 				return

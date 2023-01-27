@@ -28,7 +28,7 @@ import (
 	"github.com/telekom/aml-jens/internal/logging"
 )
 
-var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, _ = logging.GetLogger()
 
 type SQLStmt interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)

@@ -38,14 +38,11 @@ var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 //	!!! --  The Program will CRASH -- !!!
 func ExecCrashOnError(name string, arg ...string) {
 	err := execCmd(exec.Command(name, arg...))
-	go func() {
-		if err != nil {
-			INFO.Printf("Executing: %s, %v", name, arg)
-			FATAL.Printf("Error executing %s", name)
-			FATAL.Exit(err)
-		}
-	}()
-
+	if err != nil {
+		FATAL.Printf("Executing: %s, %v", name, arg)
+		FATAL.Printf("Error executing %s", name)
+		FATAL.Exit(err)
+	}
 }
 
 func execCmdOutput(cmd *exec.Cmd) (string, error) {

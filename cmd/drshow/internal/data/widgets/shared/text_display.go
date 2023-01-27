@@ -48,7 +48,7 @@ func NewTextBox(ctx context.Context, t terminalapi.Terminal, updateText <-chan s
 				if t == UPDATE_TEXT_CLEAR {
 					wrapped.Reset()
 				}
-				wrapped.Write(fmt.Sprintf("%s\n", t))
+				_ = wrapped.Write(fmt.Sprintf("%s\n", t))
 
 			case <-ctx.Done():
 				return
@@ -89,9 +89,9 @@ func NewTextWithOptsBoxAppendTopLast2(ctx context.Context, t terminalapi.Termina
 					last = ""
 				}
 
-				wrapped.Write(fmt.Sprintf("%s\n", t.str), t.Opts...)
+				_ = wrapped.Write(fmt.Sprintf("%s\n", t.str), t.Opts...)
 				if last != "" {
-					wrapped.Write(fmt.Sprintf("%s\n", last))
+					_ = wrapped.Write(fmt.Sprintf("%s\n", last))
 				}
 				last = t.str
 			case <-ctx.Done():

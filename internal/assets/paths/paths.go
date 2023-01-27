@@ -26,15 +26,27 @@ import (
 	"runtime"
 )
 
+// "/etc/jens-cli/logs/"
+//
+//go:inline
 func LOG_PATH() string {
 	return "/etc/jens-cli/logs/"
 }
+
+// "/etc/jens-cli/"
+//
+//go:inline
 func RELEASE_CFG_PATH() string {
 	return "/etc/jens-cli/"
 }
 
 var testdata = ""
 
+// Only to be used in tests
+//
+// "{}/test/testdata" (fallback to ./testdata)
+//
+//go:inline
 func TESTDATA() string {
 	if testdata == "" {
 		_, filename, _, ok := runtime.Caller(1)
@@ -46,6 +58,12 @@ func TESTDATA() string {
 
 	return testdata
 }
+
+// Only to be used in tests
+//
+// "{}/test/testdata/drp" (fallback to ./testdata/drp)
+//
+//go:inline
 func TESTDATA_DRP() string {
 	t := TESTDATA()
 	print(t)
