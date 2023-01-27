@@ -73,8 +73,7 @@ func parseArgs(res *string) (mode, error) {
 
 func main() {
 	logging.InitLogger(assets.NAME_DRSHOW)
-	logging.EnableDebug()
-	var ErrorOrNil error = nil
+	var ErrorOrNil error
 	var path string
 
 	mode, err := parseArgs(&path)

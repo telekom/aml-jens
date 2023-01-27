@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -39,6 +39,7 @@ type DB_network_flow struct {
 	measure_id_str string
 }
 
+// Executes a stmt to insert it into the DB
 func (s *DB_network_flow) Insert(stmt SQLStmt) error {
 	return stmt.QueryRow(`INSERT INTO network_flow 
 	(
@@ -51,6 +52,10 @@ func (s *DB_network_flow) Insert(stmt SQLStmt) error {
 	VALUES ( $1, $2, $3, $4, $5)
 	RETURNING flow_id;`, s.args_insert()...).Scan(&s.Flow_id)
 }
+
+// Eyecutes a or multiple sqlstmt, that will make sure its sinked with db
+//
+// In this case, it makes sure, that its not yet in db.
 func (s *DB_network_flow) Sync(stmt SQLStmt) error {
 	//DEBUG.Printf("Syncing Flow:%+v", s)
 	err := stmt.QueryRow(`SELECT flow_id FROM network_flow 

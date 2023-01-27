@@ -39,16 +39,17 @@ func NewDrpListFromFolder(path string) (*DrpListT, error) {
 		providers[i] = NewDataRatePatternFileProvider(path)
 
 	}
-	arg := []struct {
-		scale     float64
-		minrateKb float64
-	}{
-		{
-			scale:     1,
-			minrateKb: 0,
+	return NewDrpList(providers,
+		[]struct {
+			scale     float64
+			minrateKb float64
+		}{
+			{
+				scale:     1,
+				minrateKb: 0,
+			},
 		},
-	}
-	return NewDrpList(providers, arg, true)
+		true)
 }
 func NewDrpList(providers []DataRatePatternProvider, args []struct {
 	scale     float64

@@ -161,7 +161,10 @@ func Run() (uint8, string) {
 			if flow, err = manager.GetSelectedFlow(); err != nil {
 				continue
 			}
-			setLayout(ctx, t, c, manager, ui, flow.FlowId, C)
+			err = setLayout(ctx, t, c, manager, ui, flow.FlowId, C)
+			if err != nil {
+				WARN.Println(err)
+			}
 		}
 	}()
 	//Redraw Loop. Runs in background.
@@ -180,7 +183,9 @@ func Run() (uint8, string) {
 					}
 					C.UpdateFlowDetails <- f
 				}
-				setLayout(ctx, t, c, manager, ui, lt, C)
+				if err := setLayout(ctx, t, c, manager, ui, lt, C); err != nil {
+					WARN.Println(err)
+				}
 
 			}
 		}

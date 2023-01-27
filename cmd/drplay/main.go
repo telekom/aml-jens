@@ -122,8 +122,6 @@ func ArgParse() (err error) {
 
 func main() {
 	logging.InitLogger(assets.NAME_DRPLAY)
-	logging.EnableDebug()
-
 	if err := ArgParse(); err != nil {
 		FATAL.Println("Error during Argparse")
 		FATAL.Exit(err)

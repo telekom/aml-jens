@@ -67,12 +67,15 @@ func GetPersistence() (*Persistence, error) {
 	}
 	return &persistence_store, nil
 }
+
+// Initially sets the singelton_instance of persistence to v with login
+// Subsequent calls have no effect
 func SetPersistenceTo(v Persistence, login *datatypes.Login) error {
 	if persistence_store != nil {
-		INFO.Printf("NOT re-setting persistence from %v to %v\n", persistence_store, v)
+		WARN.Printf("NOT re-setting persistence from %v to %v\n", persistence_store, v)
 		return nil
 	}
-	INFO.Printf("Using %v as Persistence", reflect.TypeOf(v))
+	DEBUG.Printf("Using %v as Persistence", reflect.TypeOf(v))
 	persistence_store = v
 	return persistence_store.Init(login)
 }

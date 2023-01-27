@@ -19,20 +19,20 @@
  * under the License.
  */
 
-package logging_test
+package logging
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/telekom/aml-jens/internal/assets/paths"
-	"github.com/telekom/aml-jens/internal/logging"
 )
 
 func TestGetLoggerPrefix(t *testing.T) {
-	DEBUG, INFO, WARN, FATAL := logging.GetLogger()
+	DEBUG, INFO, WARN, FATAL := GetLogger()
 	if DEBUG.Prefix() != "[DEBUG] " {
 		t.Fatalf("DebugPrefix was not set correctly. '%s'", DEBUG.Prefix())
 	}
@@ -48,8 +48,8 @@ func TestGetLoggerPrefix(t *testing.T) {
 
 }
 func TestGetLoggerSingelton(t *testing.T) {
-	_, INFOa, WARNa, FATALa := logging.GetLogger()
-	_, INFOb, WARNb, FATALb := logging.GetLogger()
+	_, INFOa, WARNa, FATALa := GetLogger()
+	_, INFOb, WARNb, FATALb := GetLogger()
 	if INFOa != INFOb {
 		t.Fatal("Info Logger did not use singelton")
 	}
@@ -72,25 +72,63 @@ func doesFileExists(path string) (bool, error) {
 	}
 }
 func postTest(t *testing.T, path string) {
+	singelton_fatal_logger = nil
 	log_path_exists, err := doesFileExists(path)
 	if err != nil {
 		t.Logf("Error during postTest: %s", err)
 	}
 	if log_path_exists {
-		t.Log("Removing existing logs")
 		os.Remove(path)
 	}
 }
 func TestGetLoggerFileCreation(t *testing.T) {
 	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
-	logging.InitLogger("TESTING")
+	_, _, _, _ = GetLogger()
+	InitLogger("TESTING")
 	defer postTest(t, log_path)
-	_, _, _, _ = logging.GetLogger()
+
 	log_file_exists, err := doesFileExists(log_path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !log_file_exists {
 		t.Fatalf("Logging path '%s' was not created", log_path)
+	}
+}
+
+func TestInitLoggerDEBUG(t *testing.T) {
+	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
+	os.Setenv("JENS_DEBUG", "1")
+	_, _, _, _ = GetLogger()
+	InitLogger("TESTING")
+	defer postTest(t, log_path)
+	DEBUG, _, _, _ := GetLogger()
+	w := DEBUG.Writer()
+	if w == io.Discard {
+		t.Fatal("Debug output was not turned on")
+	}
+}
+func TestInitLoggerDEBUG_0(t *testing.T) {
+	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
+	os.Setenv("JENS_DEBUG", "0")
+	_, _, _, _ = GetLogger()
+	InitLogger("TESTING")
+	defer postTest(t, log_path)
+	DEBUG, _, _, _ := GetLogger()
+	w := DEBUG.Writer()
+	if w != io.Discard {
+		t.Fatal("Debug output was turned on")
+	}
+}
+func TestInitLoggerDEBUG_not(t *testing.T) {
+	os.Unsetenv("JENS_DEBUG")
+	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
+	_, _, _, _ = GetLogger()
+	InitLogger("TESTING")
+	defer postTest(t, log_path)
+	DEBUG, _, _, _ := GetLogger()
+	w := DEBUG.Writer()
+	if w != io.Discard {
+		t.Fatal("Debug output was turned on")
 	}
 }

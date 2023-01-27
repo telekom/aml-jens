@@ -29,6 +29,7 @@ import (
 
 var DEBUG, INFO, WARN, FATAL = GetLogger()
 
+// Special Exit function for incorrect arguments read in by the flag package from the cli-args.
 func FlagParseExit(msg string, a ...any) {
 	INFO.Printf(msg, a...)
 	fmt.Fprintf(flag.CommandLine.Output(), msg, a...)

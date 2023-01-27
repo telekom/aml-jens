@@ -21,6 +21,8 @@
 
 package util
 
+// Compares each entrie of a and b
+// Returns true only if a and be are of equal length AND have equal values
 func ByteCompare(a []byte, b []byte) bool {
 	if len(a) != len(b) {
 		return false

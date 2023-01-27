@@ -30,16 +30,19 @@ import (
 )
 
 type DataRatePattern struct {
-	iter           *DataRatePatternIterator
-	Name           string
-	data           *[]float64
-	Description    string
-	mapping        map[string]string
-	Min            float64
-	Max            float64
-	Avg            float64
-	Length         int
-	Sha256         []byte
+	iter   *DataRatePatternIterator
+	Name   string
+	data   *[]float64
+	Min    float64
+	Max    float64
+	Avg    float64
+	Length int
+	Sha256 []byte
+	//Description/Comment of DRP
+	Description string
+	//Contains key-value parameters
+	mapping map[string]string
+	//Parameters/ Settings set on loading the DRP
 	loadParameters struct {
 		MinRateKbits float64
 		Scale        float64
@@ -123,7 +126,7 @@ func (s *DataRatePattern) SetData(d []float64) {
 	cpy := make([]float64, len(d))
 	copy(cpy, d)
 	s.data = &cpy
-	s.iter.UpdateAndReset(s.data)
+	s.iter.updateAndReset(s.data)
 }
 
 // Returns the set data
@@ -161,7 +164,7 @@ func (s *DataRatePattern) Iterator() *DataRatePatternIterator {
 	if s.iter == nil {
 		s.iter = NewDataRatePatternIterator()
 		if s.data != nil && len(*s.data) != 0 {
-			s.iter.UpdateAndReset(s.data)
+			s.iter.updateAndReset(s.data)
 		}
 	}
 	return s.iter

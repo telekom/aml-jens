@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -86,63 +86,14 @@ func NewDrPlayTrafficControlConfig(markfree int32, markfull int32, extralatency 
 	}
 }
 
-// Update updated the config with the values supplied in other
-// Only if self has no value set
-func (self *DrPlayTrafficControlConfig) UpdateWhereNil(other DrPlayTrafficControlConfig) {
-	if self == nil {
-		self = &DrPlayTrafficControlConfig{}
-	}
-	if other.Markfree != nil && self.Markfree == nil {
-		self.Markfree = new(int32)
-		*self.Markfree = *other.Markfree
-	}
-	if other.Markfull != nil && self.Markfull == nil {
-		self.Markfull = new(int32)
-		*self.Markfull = *other.Markfull
-	}
-	if other.Extralatency != nil && self.Extralatency == nil {
-		self.Extralatency = new(int32)
-		*self.Extralatency = *other.Extralatency
-	}
-	if other.L4sEnablePreMarking != nil && self.L4sEnablePreMarking == nil {
-		self.L4sEnablePreMarking = new(bool)
-		*self.L4sEnablePreMarking = *other.L4sEnablePreMarking
-	}
-	if other.SignalDrpStart != nil && self.SignalDrpStart == nil {
-		self.SignalDrpStart = new(bool)
-		*self.SignalDrpStart = *other.SignalDrpStart
-	}
-}
-
-func (self *DrPlayTrafficControlConfig) Update(other *DrPlayTrafficControlConfig) {
-	if other == nil {
-		return
-	}
-	if self == nil {
-		self = &DrPlayTrafficControlConfig{}
-	}
-	if other.Markfree != nil {
-		self.Markfree = other.Markfree
-	}
-	if other.Markfull != nil {
-		self.Markfull = other.Markfull
-	}
-	if other.Extralatency != nil {
-		self.Extralatency = other.Extralatency
-	}
-	if other.L4sEnablePreMarking != nil {
-		self.L4sEnablePreMarking = other.L4sEnablePreMarking
-	}
-	if other.SignalDrpStart != nil {
-		self.SignalDrpStart = other.SignalDrpStart
-	}
-}
-
+// Validate membervariables
 func (tcSet *DrPlayTrafficControlConfig) Validate() error {
 	E := func(s string) error { return (fmt.Errorf("tcDrPlaySetting: %s", s)) }
 	if (tcSet.Markfree != nil && tcSet.Markfull != nil) && *tcSet.Markfree > *tcSet.Markfull {
 		return E("Markfree can not be greater or equal to Markfull")
 	}
-
+	if tcSet.Extralatency != nil && *tcSet.Extralatency < 0 && *tcSet.Extralatency > 100 {
+		return E(fmt.Sprintf("Extralatency should be inbetween 0 and 100; is %d", *tcSet.Extralatency))
+	}
 	return nil
 }
