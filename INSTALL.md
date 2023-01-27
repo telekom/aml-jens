@@ -21,7 +21,7 @@ The command drshow visualizes measures or data rate patterns on a terminal ui.
 
 `Root` privileges are required
 
-* Make the JENS package repository visible by executing the script `setupApt.sh`
+* Make the JENS package repository visible by executing the script `scripts/setupApt.sh`
 * Run `apt install jens-cli`
 * The executables drplay drbenchmark and drshow are now ready to be used
   `drplay -dev eno1 -loop | drshow`
@@ -50,11 +50,7 @@ Output e.g.:
 
 ```
 timestampMs sojournTimeMs loadKbits capacityKbits ecnCePercent dropped netflow
-1657796730820 0 0 20668 0 0 192.168.178.101:0-192.168.178.75:0
-1657796731821 0 0 20294 0 0 192.168.178.101:0-192.168.178.75:0
 1657796732546 0 0 20507 0 0 192.168.178.101:22-192.168.178.75:57994
-1657796732821 0 0 20905 0 0 192.168.178.101:0-192.168.178.75:0
-1657796733822 0 0 20116 0 0 192.168.178.101:0-192.168.178.75:0
 1657796734410 0 0 20853 0 0 192.168.178.101:22-192.168.178.75:57994
 1657796734436 0 200 20105 0 0 192.168.178.101:22-192.168.178.75:57994
 1657796734436 0 3100 20105 0 0 192.168.178.101:5201-192.168.178.75:5201
@@ -234,26 +230,6 @@ If docker was installed without root-privileges, you need to expose the ports of
 
 # Annex
 
-## setupApt.sh
-```sh
-#! /bin/sh
-
-echo 'deb [trusted=yes] https://jens.llcto.telekom-dienste.de/ ./' | tee -a /etc/apt/sources.list
-echo '
-Package: iproute2
-Pin: origin jens.llcto.telekom-dienste.de
-Pin-Priority: 1001
-' > /etc/apt/preferences
-
-echo '
-machine https://jens.llcto.telekom-dienste.de/
-login jens_fileserver
-password 3+bEacQgweal0ruf7A6gt2FkoDK0mcNz9y03Lbl3Qkc=
-' > /etc/apt/auth.conf
-
-apt update
-
-```
 ## Sample Test-Setup
 
 ### Requirements:
@@ -265,10 +241,10 @@ apt update
 ### Setup:
 
 #### On the other machine
-1. Launch iperf3 in Servermode (`iperf3 -s`)
+1. Launch iperf3 as server (`iperf3 -s`)
 
 #### On JENS / the ssh connection to JENS
-* Launch `drplay -dev <dev> -psql -tag iperf3-setup-test`
+* Launch `drplay -dev <dev> -psql -tag iperf3-setup-test-ecn1`
   * With `<dev>` being a NIC on JENS (e.g. `wlp0s20f3` or `eno1`or ... )
 * Launch iperf3 as a Client `iperf3 -c <other_machine_ip> --udp -t 100 -i 0.5 -b 18M -S 0x1`
   * `-S 0x1` Mark the packets as ecn-enabled

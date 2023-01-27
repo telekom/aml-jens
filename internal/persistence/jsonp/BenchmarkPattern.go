@@ -45,7 +45,9 @@ func NewBenchmarkPattern(path string, setting DrplaySetting) BenchmarkPattern {
 		Path:    path,
 		Setting: setting,
 	}
-	b.checkOrCalcHash()
+	if err := b.checkOrCalcHash(); err != nil {
+		WARN.Println(err)
+	}
 	return b
 }
 

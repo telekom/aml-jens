@@ -25,9 +25,8 @@ import (
 	"fmt"
 )
 
-//Implements MassPersistable interface
+// Implements MassPersistable interface
 type DB_measure_packet struct {
-	//Only for inprogram use! (=netFlowID)
 	Time                uint64
 	PacketSojournTimeMs uint32
 	LoadKbits           uint32

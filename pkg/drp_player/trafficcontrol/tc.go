@@ -148,15 +148,16 @@ func (tc *TrafficControl) Close() error {
 	}
 
 	if err := tc.Reset(); err != nil {
-		INFO.Printf("Could not reset TC in Close(): %v", err)
+		WARN.Printf("Could not reset TC in Close(): %v", err)
 	}
 	if err := tc.control_file.Close(); err != nil {
-		INFO.Printf("Could not close control_file TC in Close(): %v", err)
+		WARN.Printf("Could not close control_file TC in Close(): %v", err)
 	}
 	DEBUG.Println("Closed tc")
 	return nil
 }
 
+// Changes the current bandwidth limit to rate
 func (tc *TrafficControl) ChangeTo(rate float64) error {
 	changeRateArray := make([]byte, 8)
 	currentDataRateBit := uint64(rate) * 1000
@@ -166,6 +167,8 @@ func (tc *TrafficControl) ChangeTo(rate float64) error {
 	return err
 }
 
+// Starts a goroutine that will change the current bandwidth restriciton.
+// A change will occur after the waitTime is exceeded
 func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, wg *sync.WaitGroup, drp *datatypes.DB_data_rate_pattern) error {
 	defer wg.Done()
 	ticker := time.NewTicker(waitTime)

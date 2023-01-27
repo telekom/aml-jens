@@ -23,6 +23,7 @@ package datatypes
 
 import (
 	"database/sql"
+	"fmt"
 	"net"
 
 	"github.com/telekom/aml-jens/internal/util"
@@ -46,20 +47,9 @@ type DB_session struct {
 	// DB_Relations
 	ParentBenchmark *DB_benchmark
 	ChildDRP        *DB_data_rate_pattern
-	//Todo: Change from persistence map to this!
-	knownFlowsByMeasure_ID map[string]int
 }
 
-func (s *DB_session) GetFlowIDbyMeasureStr(m string) int {
-	res, ok := s.knownFlowsByMeasure_ID[m]
-	if ok {
-		return res
-	}
-	return -1
-}
-func (s *DB_session) AddFlow(f *DB_network_flow) {
-	s.knownFlowsByMeasure_ID[f.MeasureIdStr()] = f.Flow_id
-}
+// Executes a sqlstmt to Insert this session into DB
 func (s *DB_session) Insert(stmt SQLStmt) error {
 	err := s.ChildDRP.Insert(stmt)
 	if err != nil {
@@ -88,11 +78,15 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 		s.L4sEnablePreMarking).Scan(&s.Session_id)
 	return err
 }
+
+// == Insert()
 func (s *DB_session) Sync(stmt SQLStmt) error {
-	DEBUG.Println("Syncing a Session has no effect. Calling Insert instead")
+	WARN.Println("Syncing a Session has no effect. Calling Insert instead")
 	return s.Insert(stmt)
 }
 
+// Set the Session to belong to a benchmark.
+// This is important for the DB-Insert
 func (s *DB_session) SetParentBenchmark(bm *DB_benchmark) {
 	s.ParentBenchmark = bm
 }
@@ -104,6 +98,7 @@ func (s *DB_session) getBenchmarkId() sql.NullInt64 {
 	}
 }
 
+// Validate uniquiness of the tagname in the benchmark
 func (s *DB_session) ValidateUniqueName(stmt SQLStmt) error {
 	exists := false
 	err := stmt.QueryRow("select exists (select distinct session_id from session_tag where name = $1 and benchmark_id=$2)",
@@ -121,7 +116,7 @@ func (s *DB_session) ValidateUniqueName(stmt SQLStmt) error {
 
 func (s *DB_session) Validate() (err error) {
 	if _, err := net.InterfaceByName(s.Dev); err != nil {
-		FATAL.Exitf("'%s' is not a recognized interface -> %v", s.Dev, err)
+		return fmt.Errorf("'%s' is not a recognized interface -> %v", s.Dev, err)
 	}
 	return s.ChildDRP.Validate()
 }

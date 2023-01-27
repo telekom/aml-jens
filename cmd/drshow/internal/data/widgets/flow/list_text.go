@@ -50,16 +50,11 @@ func NewFlowListTextBox(ctx context.Context, t terminalapi.Terminal, updateFlows
 		for {
 			select {
 			case man := <-updateFlows:
-				if time.Now().Sub(lastUpdate) < time.Second {
+				if time.Since(lastUpdate) < time.Second {
 					continue
 				}
 				wrapped.Reset()
-				_, absoluteIndexes, eligableFlows := man.EligibleFLows()
-				col_count := len(absoluteIndexes) / ROW_COUNT
-				if len(absoluteIndexes)%ROW_COUNT != 0 {
-					col_count++
-				}
-
+				_, _, eligableFlows := man.EligibleFLows()
 				colC, rowC, dataTablePtr := convertFlowsTo2dArray(eligableFlows, ROW_COUNT)
 				if dataTablePtr == nil {
 					break
@@ -88,10 +83,10 @@ func writeHiglightedColoredIf(wrapped *text.Text, b bool, t string, color uint8)
 }
 func print2dArrayOfFlows(wrapped *text.Text, dataTable *[][]*flowdata.FlowT, rowC int, colC int, m *flowdata.FlowManager) {
 	selectedFlow, _ := m.GetSelectedFlow()
-	defer wrapped.Write(strings.Repeat("       ⤻    ", colC-1))
+	defer func() { _ = wrapped.Write(strings.Repeat("       ⤻    ", colC-1)) }()
 
 	writeLine := func(lineNbr int, t *[][]*flowdata.FlowT) {
-		defer wrapped.Write("\n")
+		defer func() { _ = wrapped.Write("\n") }()
 		for i := 0; i < len(*dataTable); i++ {
 			flow := (*t)[i][lineNbr]
 			if flow == nil {
@@ -141,7 +136,7 @@ func convertFlowsTo2dArray(eligibleFlows []*flowdata.FlowT, rowC int) (int, int,
 		colC++
 	}
 	t := make([][]*flowdata.FlowT, colC)
-	for i, _ := range t {
+	for i := range t {
 		t[i] = make([]*flowdata.FlowT, rowC)
 	}
 

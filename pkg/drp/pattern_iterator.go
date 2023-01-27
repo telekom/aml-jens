@@ -41,14 +41,20 @@ func NewDataRatePatternIterator() *DataRatePatternIterator {
 		position: -1,
 	}
 }
-func (s *DataRatePatternIterator) UpdateAndReset(drp *[]float64) {
+
+// updates internal data pointer as well as position and value
+func (s *DataRatePatternIterator) updateAndReset(drp *[]float64) {
 	s.data = drp
 	s.position = -1
 	s.value = (*drp)[0]
 }
+
+// Retunrs last value
 func (s *DataRatePatternIterator) Value() float64 {
 	return s.value
 }
+
+// Get next Value
 func (s *DataRatePatternIterator) Next() (float64, error) {
 	switch max_i := len(*s.data); {
 	case s.position == -1:
@@ -77,13 +83,19 @@ func (s *DataRatePatternIterator) Next() (float64, error) {
 	}
 	return s.value, nil
 }
+
+// Turns on / off looping-mode
 func (s *DataRatePatternIterator) SetLooping(endless bool) {
 	s.looping = endless
 }
+
+// returns if looping is on
 func (s *DataRatePatternIterator) IsLooping() bool {
 	return s.looping
 }
 
+// Sets the Iterator to a Doen state.
+// Subsequent calls to Next will raise an IterableStopError
 func (s *DataRatePatternIterator) SetDone() {
 	s.SetLooping(false)
 	s.operator = +1

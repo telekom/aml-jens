@@ -184,7 +184,10 @@ func (man *FlowManager) Append(f *FlowT) {
 		if man.selectedFlowIndex != 0 {
 			man.ExitApplicationErr("unknown selected flow")
 		}
-		man.Handler.NewFlowSelected(man)
+		err = man.Handler.NewFlowSelected(man)
+		if err != nil {
+			WARN.Println(err)
+		}
 		man.Handler.OnFirstFlowAdded(man)
 	}
 }

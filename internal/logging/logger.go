@@ -27,6 +27,7 @@ import (
 	rlog "log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/telekom/aml-jens/internal/assets"
@@ -58,37 +59,9 @@ var (
 	fp                     *os.File     = nil
 )
 
-type dualWriter struct {
-	file *os.File
-	out  *os.File
-}
-
-func NewDualWriter(file *os.File, out *os.File) *dualWriter {
-	return &dualWriter{
-		file: file,
-		out:  out,
-	}
-}
-func (s *dualWriter) Write(p []byte) (n int, err error) {
-	n, err = s.file.Write(p)
-	if err != nil {
-		return n, err
-	}
-	start := 0
-	for i, v := range p {
-		if v == byte(']') {
-			start = (i + 1)
-			break
-		}
-	}
-	n, err = s.out.Write([]byte("An error occurred:"))
-	if err != nil {
-		return n, err
-	}
-	n, err = s.out.Write(p[start:])
-	return n, err
-}
-
+// Initialize all Loggers.
+// Ueses name as the program_name --> filepath
+// if JENS_DEBUG is set in env, DebugPrints are enabled
 func InitLogger(name string) {
 	var err error
 	err = os.MkdirAll(paths.LOG_PATH(), 0666)
@@ -111,11 +84,14 @@ func InitLogger(name string) {
 	}
 	singelton_info_logger.SetOutput(fp)
 	singelton_warn_logger.SetOutput(fp)
-	singelton_fatal_logger.SetOutput(NewDualWriter(fp, os.Stderr))
+	singelton_fatal_logger.SetOutput(io.MultiWriter(fp, os.Stderr))
+	debug_mode, err := strconv.ParseBool(os.Getenv("JENS_DEBUG"))
+	if err == nil && debug_mode {
+		singelton_debug_logger.SetOutput(fp)
+	}
 }
-func EnableDebug() {
-	singelton_debug_logger.SetOutput(fp)
-}
+
+// Add a Exit Function to the FATAL logger only.
 func LinkExitFunction(exit func() uint8, timeoutMs int) {
 	if singelton_fatal_logger != nil {
 		singelton_fatal_logger.setExitFunc(exit, timeoutMs)
@@ -123,8 +99,13 @@ func LinkExitFunction(exit func() uint8, timeoutMs int) {
 		rlog.Default().Fatal("Cant set Exit funtion on not set Logger")
 	}
 }
+
+// Retrieve the loggers. Potentially Create them.
+//
+// Returns:
+// DEBUG, INFO, WARN, FATAL
 func GetLogger() (debug *rlog.Logger, info *rlog.Logger, warn *rlog.Logger, fatal LoggerType) {
-	if singelton_fatal_logger == nil || singelton_info_logger == nil {
+	if singelton_fatal_logger == nil || singelton_warn_logger == nil || singelton_info_logger == nil || singelton_debug_logger == nil {
 		singelton_debug_logger = (rlog.New(io.Discard, assets.LOG_PRE_DEBUG, assets.LOG_SETTING))
 		singelton_info_logger = (rlog.New(os.Stderr, assets.LOG_PRE_INFO, assets.LOG_SETTING))
 		singelton_fatal_logger = NewCustomLogger(rlog.New(os.Stderr, assets.LOG_PRE_FATAL, assets.LOG_SETTING))

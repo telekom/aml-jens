@@ -22,7 +22,7 @@
 package datatypes_test
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,9 +32,9 @@ import (
 	"github.com/telekom/aml-jens/pkg/drp"
 )
 
-func getDrps(t *testing.T, path string) []string {
+func getPotentialDataRatePatternPathsFromFolder(t *testing.T, path string) []string {
 	res := make([]string, 0, 6)
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestStdDrp(t *testing.T) {
 		"drp_munich_outskirt.csv": "832dcb6836a5eec870d2db66b5c77956",
 		"drp_munich_village.csv":  "394fa74338d447539e9d0b7e52240a99",
 	}
-	drps := getDrps(t, paths.TESTDATA_DRP())
+	drps := getPotentialDataRatePatternPathsFromFolder(t, paths.TESTDATA_DRP())
 	if len(drps) == 0 {
 		t.Fatal("No std DRPs found.")
 	}

@@ -150,7 +150,7 @@ func (s *DB_data_rate_pattern) Insert(stmt SQLStmt) error {
 	return err
 }
 func (s *DB_data_rate_pattern) Sync(stmt SQLStmt) error {
-	FATAL.Println("Syncing a DRP has no effect. INSERTING instead")
+	WARN.Println("Syncing a DRP has no effect. INSERTING instead")
 	return s.Insert(stmt)
 }
 

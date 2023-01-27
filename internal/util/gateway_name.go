@@ -66,6 +66,7 @@ func isIpOrJens(adr string) bool {
 	return net.ParseIP(adr) != nil || adr == "jens"
 }
 
+// Returns educated guess, on which ip the grafana is reachable
 func RetrieveMostLikelyGatewayIp() string {
 	usr := get_user()
 	if usr == "-" {

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/config"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
 )
@@ -43,7 +44,7 @@ func preTest(t *testing.T, args []string) func() {
 	}
 }
 func TestArgParse(t *testing.T) {
-	viper.GetViper().AddConfigPath(filepath.Join("../../test/testdata/", "config"))
+	viper.GetViper().AddConfigPath(filepath.Join("../../test/testdata/", assets.CFG_FILE_NAME))
 	//Sadly only able to test all, due to flag package
 	//not having a reset function
 	possibleArgs := [][]string{

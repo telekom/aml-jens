@@ -21,16 +21,6 @@
 
 package assets
 
-/*
- * CM = Common
- * DP = DrPlay
- * DS = DrShow
- */
-const (
-	CM_UpdateAvailable = "An update for jens-cli was found.\nYou can install it by running 'apt-get update && apt-get upgrade'\n"
-	DS_FlowHelpMessage = ""
-)
-
 const (
 	CFG_FILE_NAME           = "config"
 	DRSHOW_EXPORT_PATH_NAME = "export_%s_%s.flow.csv"

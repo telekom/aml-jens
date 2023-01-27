@@ -22,7 +22,7 @@
 package datatypes_test
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,7 +132,8 @@ func TestDrpHashWithChangesToScaleMinLoop(t *testing.T) {
 }
 
 func TestBroken(t *testing.T) {
-	files, err := ioutil.ReadDir(paths.TESTDATA_DRP())
+
+	files, err := os.ReadDir(paths.TESTDATA_DRP())
 	if err != nil {
 		t.Skipf("While reading testdata: %s", err)
 	}

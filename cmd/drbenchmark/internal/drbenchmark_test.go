@@ -287,7 +287,10 @@ func TestReadBenchmarkFromFileAllSettingsPattern(t *testing.T) {
 }
 
 func TestReadBenchmarkFromFile(t *testing.T) {
-	persistence.SetPersistenceTo(&mock.Database{}, &datatypes.Login{})
+	if err := persistence.SetPersistenceTo(&mock.Database{}, &datatypes.Login{}); err != nil {
+		t.Log(err)
+		t.Skip()
+	}
 
 	bm, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_CombinedTests))
 	if err != nil {
@@ -437,35 +440,44 @@ func TestInvalidPatternHash(t *testing.T) {
 	}
 }
 
-func TestBrokenBenchmarkNoPatterns(t *testing.T) {
+func prePatternTest(t *testing.T) {
+	t.Helper()
 	viper.AddConfigPath(utiltest.TEST_CONFIG_PATH)
-	persistence.SetPersistenceTo(&mock.Database{}, nil)
+	if err := persistence.SetPersistenceTo(&mock.Database{}, nil); err != nil {
+		t.Skip(err)
+	}
+}
+
+func TestBrokenBenchmarkNoPatterns(t *testing.T) {
+	prePatternTest(t)
 	_, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_NoPatterns))
 	if err == nil {
 		t.Fatal("Loaded benchmark without patterns")
 	}
 }
 func TestBrokenBenchmarkNoPatternsEmptyObj(t *testing.T) {
-	viper.AddConfigPath(utiltest.TEST_CONFIG_PATH)
-	persistence.SetPersistenceTo(&mock.Database{}, nil)
+	prePatternTest(t)
 	_, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_NoPatternsEmptyObj))
 	if err == nil {
 		t.Fatal("Loaded benchmark without patterns (empty obj)")
 	}
 }
 func TestBrokenBenchmarkEmptyFile(t *testing.T) {
+	prePatternTest(t)
 	_, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_EmptyFile))
 	if err == nil {
 		t.Fatal("Loaded broken benchmark (T_EmptyFile)")
 	}
 }
 func TestBrokenBenchmarkEmptyFileJSONObj(t *testing.T) {
+	prePatternTest(t)
 	_, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_EmptyFileJSONObj))
 	if err == nil {
 		t.Fatal("Loaded broken benchmark (T_EmptyFileJSONObj)")
 	}
 }
 func TestBrokenBenchmarkNoInner(t *testing.T) {
+	prePatternTest(t)
 	_, err := jsonp.LoadDB_benchmarkFromJson(fmt.Sprintf(BENCHMARK_PATH, T_NoInner))
 	if err == nil {
 		t.Fatal("Loaded broken benchmark (T_NoInner)")
