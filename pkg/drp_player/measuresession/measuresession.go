@@ -35,7 +35,6 @@ package measuresession
 */
 import "C"
 import (
-	"encoding/binary"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -58,21 +57,6 @@ var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 type DB_measure_packet = datatypes.DB_measure_packet
 type DB_network_flow = datatypes.DB_network_flow
 type DB_measure_queue = datatypes.DB_measure_queue
-
-type PacketMeasure struct {
-	//internal use, as unique ID
-	timestampMs    uint64
-	sojournTimeMs  uint32
-	ecnIn          uint8
-	ecnOut         uint8
-	ecnValid       bool
-	slow           bool
-	mark           bool
-	drop           bool
-	ipVersion      uint8
-	packetSizeByte uint32
-	net_flow       *datatypes.DB_network_flow
-}
 
 type AggregateMeasure struct {
 	sampleCount      uint32
@@ -129,39 +113,13 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
 	s.sampleCount++
 }
 
-type DbPacketMeasure struct {
-	timestampMs   uint64
-	sojournTimeMs uint32
-	loadKbits     uint32
-	capacityKbits uint32
-	ecnCePercent  uint32
-	dropped       uint32
-	netFlow       string
-}
-
-type DbQueueMeasure struct {
-	timestampMs            uint64
-	numberOfPacketsInQueue uint16
-	memUsageBytes          uint32
-}
-
 const MM_FILE = "/sys/kernel/debug/sch_janz/0001:0"
-
-const RECORD_SIZE = 64
-const QUEUE_DATA = 6
-const PACKET_DATA = 7
-const TC_JENS_RELAY_ECN_VALID = 1 << 2
-const TC_JENS_RELAY_SOJOURN_SLOW = 1 << 5
-const TC_JENS_RELAY_SOJOURN_MARK = 1 << 6
-const TC_JENS_RELAY_SOJOURN_DROP = 1 << 7
 
 const SAMPLE_DURATION_MS = 10
 
 var bool2int = map[bool]int8{false: 0, true: 1}
 
 type exitStruct struct{}
-
-var WaitGroup sync.WaitGroup
 
 // Start the measuresession
 //
@@ -170,7 +128,7 @@ var WaitGroup sync.WaitGroup
 // Blocking - spawns 3 (three)  more goroutines, adds them to wg
 func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r util.RoutineReport) {
 	// open memory file stream
-	recordArray := make([]byte, RECORD_SIZE)
+	recordArray := make(RecordArray, RECORD_SIZE)
 	INFO.Println("start measure session")
 	var file, err = os.Open(MM_FILE)
 	if err != nil {
@@ -225,79 +183,47 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 			}
 		}
 	}()
+	done := func() {
+		persistor.Close()
+		r.Wg.Done()
+	}
 	for {
 		select {
+
 		case <-r.On_extern_exit_c:
 			DEBUG.Println("Closing measuresession - recordarray parser")
-			persistor.Close()
-			r.Wg.Done()
+			done()
 			return
 		case bytesRead := <-chan_poll_result:
 			// read one record of either packet or queue type
-			if bytesRead != 64 {
+			if bytesRead != RECORD_SIZE {
 				continue
 			}
-			timestampMs := uint64(binary.LittleEndian.Uint64(recordArray[0:8])) / 1e6
-			packetType := recordArray[8]
-
-			if packetType == PACKET_DATA {
-				sojournTimeMs := uint32(binary.LittleEndian.Uint32(recordArray[12:16])) / 1e3
-				ecnIn := recordArray[9] & 3
-				ecnOut := (recordArray[9] & 24) >> 3
-				ecnValid := (recordArray[9] & TC_JENS_RELAY_ECN_VALID) != 0
-				slow := (recordArray[9] & TC_JENS_RELAY_SOJOURN_SLOW) != 0
-				mark := (recordArray[9] & TC_JENS_RELAY_SOJOURN_MARK) != 0
-				drop := (recordArray[9] & TC_JENS_RELAY_SOJOURN_DROP) != 0
-				ipVersion := recordArray[52]
-				srcIp := fmt.Sprintf("%d.%d.%d.%d", uint8(recordArray[28]), uint8(recordArray[29]), uint8(recordArray[30]), uint8(recordArray[31]))
-				dstIp := fmt.Sprintf("%d.%d.%d.%d", uint8(recordArray[44]), uint8(recordArray[45]), uint8(recordArray[46]), uint8(recordArray[47]))
-				packetSize := uint32(binary.LittleEndian.Uint32(recordArray[48:52]))
-				nextHdr := recordArray[53]
-				var srcPort uint16 = 0
-				var dstPort uint16 = 0
-				if nextHdr == 6 || nextHdr == 17 {
-					srcPort = uint16(binary.LittleEndian.Uint16(recordArray[54:56]))
-					dstPort = uint16(binary.LittleEndian.Uint16(recordArray[56:58]))
-				}
-				if srcIp != "0.0.0.0" && dstIp != "0.0.0.0" {
-					flow := datatypes.DB_network_flow{
-						Source_ip:        srcIp,
-						Source_port:      srcPort,
-						Destination_ip:   dstIp,
-						Destination_port: dstPort,
-						Session_id:       session.Session_id,
+			switch recordArray.type_id() {
+			case RECORD_TYPE_Q:
+				queueMeasure, err := recordArray.AsDB_measure_queue(diffTimeMs, session.Session_id)
+				if err != nil {
+					r.Send_error_c <- err
+					done()
+					return
 					}
-					packetMeasure := PacketMeasure{
-						timestampMs:    timestampMs,
-						sojournTimeMs:  sojournTimeMs,
-						ecnIn:          ecnIn,
-						ecnOut:         ecnOut,
-						ecnValid:       ecnValid,
-						slow:           slow,
-						mark:           mark,
-						drop:           drop,
-						ipVersion:      ipVersion,
-						packetSizeByte: packetSize,
-						net_flow:       &flow,
+				chan_pers_sample <- *queueMeasure
+			case RECORD_TYPE_P:
+				packetMeasure, err := recordArray.AsPacketMeasure(session.Session_id)
+				if err != nil {
+					r.Send_error_c <- err
+					done()
+					return
 					}
-					chan_pers_measure <- packetMeasure
-				} else {
+				if packetMeasure == nil {
 					INFO.Printf("non ip packet ignored\n")
+				} else {
+					chan_pers_measure <- *packetMeasure
 				}
-			} else if packetType == QUEUE_DATA {
-				// to do: persistance
-				numberOfPacketsInQueue := uint16(binary.LittleEndian.Uint16(recordArray[10:12]))
-				memUsageBytes := uint32(binary.LittleEndian.Uint32(recordArray[12:16]))
-				currentEpochMs := timestampMs + diffTimeMs
-				queueMeasure := DB_measure_queue{
-					Time:              currentEpochMs,
-					Memoryusagebytes:  memUsageBytes,
-					PacketsInQueue:    numberOfPacketsInQueue,
-					Fk_session_tag_id: session.Session_id,
+			default:
+				WARN.Printf("Cant Parse recordarray %v: unknown type", recordArray)
 				}
 
-				chan_pers_sample <- queueMeasure
-			}
 			recordCount++
 		}
 	}
