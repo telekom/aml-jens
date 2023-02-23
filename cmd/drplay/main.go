@@ -25,6 +25,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
@@ -120,8 +122,26 @@ func ArgParse() (err error) {
 	return err
 }
 
+func exithandler(player *drplay.DrpPlayer, exit chan uint8) {
+
+	exit_handler := make(chan os.Signal)
+	signal.Notify(exit_handler, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT)
+	go func() {
+		select {
+		case <-exit:
+			return
+		case sig := <-exit_handler:
+			INFO.Printf("Received Signal: %d", sig)
+			player.Exit()
+
+		}
+
+	}()
+}
+
 func main() {
 	logging.InitLogger(assets.NAME_DRPLAY)
+	var player_has_ended = make(chan uint8)
 	if err := ArgParse(); err != nil {
 		FATAL.Println("Error during Argparse")
 		FATAL.Exit(err)
@@ -135,7 +155,14 @@ func main() {
 	if err != nil {
 		FATAL.Exit(err)
 	}
-	drplay.StartDrpPlayer(session)
+	player := drplay.NewDrpPlayer(session)
+	exithandler(player, player_has_ended)
+	err = player.Start()
+	if err != nil {
+		FATAL.Exit(err)
+	}
+	player.Wait()
+	close(player_has_ended)
 	if err := (*db).Close(); err != nil {
 		FATAL.Exit(err)
 	}

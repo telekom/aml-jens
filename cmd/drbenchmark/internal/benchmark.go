@@ -108,7 +108,8 @@ func Play(benchmark *datatypes.DB_benchmark) (err error) {
 
 		time.Sleep(2 * time.Second)
 		v.Time = uint64(time.Now().UnixMilli())
-		drplay.StartDrpPlayer(v)
+		player := drplay.NewDrpPlayer(v)
+		player.Start()
 		(*db).ClearCache()
 		_, start_t, end_t, err := (*db).GetSessionStats(v.Session_id)
 		if err != nil {
