@@ -273,7 +273,9 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, cha
 func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasure, persist_samples chan interface{}, channel_exit chan struct{}, diffTimeMs uint64, tc *trafficcontrol.TrafficControl) {
 	sampleDuration := SAMPLE_DURATION_MS * time.Millisecond
 	ticker := time.NewTicker(sampleDuration)
-
+	//Use of sync.Map instead of map:
+	//Used as a cache
+	mapMeasures := sync.Map{}
 	// stdout heading
 	if session.ParentBenchmark.PrintToStdOut {
 		fmt.Println(strings.Join(assets.CONST_HEADING, " "))
@@ -302,13 +304,15 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 				if err != nil {
 					FATAL.Exit(err)
 				}
-				if err := (*p).Persist(message.net_flow); err != nil {
-					FATAL.Exit(err)
+				measure, _ := mapMeasures.LoadOrStore(single_packet_measure.net_flow.MeasureIdStr(), NewAggregateMeasure(single_packet_measure.net_flow))
+				m, ok := measure.(*AggregateMeasure)
+				if !ok {
+					//This should NEVER happen
+					r.Send_error_c <- fmt.Errorf("stored %+v in mapMeasures", measure)
+					r.Wg.Done()
+					return
 				}
-				measure, keyExists := mapMeasures[message.net_flow.MeasureIdStr()]
-				if !keyExists {
-					measure = NewAggregateMeasure(message.net_flow)
-					mapMeasures[message.net_flow.MeasureIdStr()] = measure
+				m.add(&single_packet_measure, tc.CurrentRate())
 				}
 
 				measure.add(&message, tc.CurrentRate())
@@ -316,38 +320,43 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 			default:
 				readMessages = false
 			}
+			mapMeasures.Range(func(key any, value any) bool {
+				aggregated_measure, ok := value.(*AggregateMeasure)
+				if !ok {
+					WARN.Println("Can NOT iterate Measures, got invalid value.")
+					return false
 		}
-		for _, aggregated_measure := range mapMeasures {
 			if aggregated_measure.sampleCount == 0 {
-				continue
+					return true
 			}
-			// send to persist measure sample
-			currentEpochMs := message.timestampMs + diffTimeMs
-			sample := aggregated_measure.toDB_measure_packet(currentEpochMs)
-			if session.ParentBenchmark.CsvOuptut {
+				currentEpochMs := time.Now().UnixNano()/(int64(time.Millisecond)/int64(time.Nanosecond)) - 5
+
+				sample := aggregated_measure.toDB_measure_packet(uint64(currentEpochMs))
 				if sample.Capacitykbits == 0 {
 					//this sometimes happens
 					//Everything in the sample is zero but the time
 					if sample.Dropped != 0 || sample.LoadKbits != 0 || sample.Ecn != 0 {
-						INFO.Printf("Capacity is 0 but not everything: %+v", sample)
-						continue
+						DEBUG.Printf("Capacity is 0 but not everything: %+v", sample)
+						return true
 					}
-					DEBUG.Printf("Not Persisting: %+v", sample)
-					continue
-				}
+					INFO.Printf("Not Persisting: %+v", sample)
+					return true
 			}
 			persist_samples <- sample
 			if session.ParentBenchmark.PrintToStdOut {
-				if sample.PrintLine(aggregated_measure.net_flow.MeasureIdStr()) != nil {
-					INFO.Println("Could not write Measurement")
-					_ = syscall.Kill(syscall.Getpid(), syscall.SIGPIPE)
+					if err := sample.PrintLine(aggregated_measure.net_flow.MeasureIdStr()); err != nil {
+						WARN.Println("Could not write Measurement")
+						r.Send_error_c <- err
+						r.Wg.Done()
+						return false
 				}
 			}
-		}
-		if doExit {
-			persist_samples <- exitStruct{}
-			WaitGroup.Done()
-			return
+				return true
+			})
+			mapMeasures.Range(func(key, value any) bool {
+				mapMeasures.Delete(key)
+				return true
+			})
 		}
 	}
 }
