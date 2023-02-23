@@ -95,16 +95,15 @@ func (s *MeasureSessionPersistor) persist(sample interface{}, r util.RoutineRepo
 	if s.csv == nil {
 		return
 	}
-	DEBUG.Printf("Trying: %T", sample)
 	if csvsample, ok := sample.(datatypes.DB_measure_queue); ok {
-		DEBUG.Printf("Persisitng DB_measure_queue: %v", csvsample)
+		//DEBUG.Printf("Persisitng DB_measure_queue: %v", csvsample)
 		if err := s.csv.QueueWriter.Write((csvsample).CsvRecord()); err != nil {
 			r.Send_error_c <- fmt.Errorf("persisting DB_measure_queue (%+v) to csv file: %w", sample, err)
 		}
 		return
 	}
 	if csvsample, ok := sample.(datatypes.DB_measure_packet); ok {
-		DEBUG.Printf("Persisitng DB_measure_packet: %v", csvsample)
+		//DEBUG.Printf("Persisitng DB_measure_packet: %v", csvsample)
 		if err := s.csv.PacketWriter.Write((csvsample).CsvRecord()); err != nil {
 			r.Send_error_c <- fmt.Errorf("persisting DB_measure_packet (%+v) to csv file: %w", sample, err)
 		}
@@ -143,11 +142,11 @@ func (s *MeasureSessionPersistor) Run(r util.RoutineReport, samples chan interfa
 						s.persist(sampleInterface, r)
 						sampleQueueCount++
 					case exitStruct:
-						INFO.Println("Exiting persistMeasures: due to struct")
+						DEBUG.Println("Exiting persistMeasures: due to struct")
 						r.Wg.Done()
 						return
 					default:
-						FATAL.Println("Unexpected Input in persistMeasures")
+						FATAL.Printf("Unexpected Input in persistMeasures %+v", sampleInterface)
 					}
 				default:
 					readSamples = false

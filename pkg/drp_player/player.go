@@ -102,9 +102,8 @@ func (s *DrpPlayer) Wait() {
 	s.r.Wg.Wait()
 }
 func (s *DrpPlayer) Exit() {
-	DEBUG.Println("Exiting")
 	close(s.r.On_extern_exit_c)
-	DEBUG.Println("Waiting")
+	DEBUG.Println("Waiting for routines to end")
 	s.Wait()
 	DEBUG.Println("exit_clean")
 	s.exit_clean()

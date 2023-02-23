@@ -153,7 +153,6 @@ func (tc *TrafficControl) Close() error {
 	if err := tc.control_file.Close(); err != nil {
 		WARN.Printf("Could not close control_file TC in Close(): %v", err)
 	}
-	DEBUG.Println("Closed tc")
 	return nil
 }
 
