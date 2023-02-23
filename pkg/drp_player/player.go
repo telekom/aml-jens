@@ -2,17 +2,17 @@ package drpplayer
 
 import "C"
 import (
+	"fmt"
 	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/persistence"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
+	"github.com/telekom/aml-jens/internal/util"
 	"github.com/telekom/aml-jens/pkg/drp_player/measuresession"
 	"github.com/telekom/aml-jens/pkg/drp_player/trafficcontrol"
 )
@@ -22,35 +22,28 @@ const CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
 var g_channel_exit = make(chan struct{})
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-func StartDrpPlayer(session *datatypes.DB_session) {
-	exit_handler_channel := make(chan os.Signal, 1)
-	signal.Notify(exit_handler_channel, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT)
-	logging.LinkExitFunction(func() uint8 {
-		exit_handler_channel <- syscall.SIGQUIT
-		return 0
-	}, 2500)
-	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", session.ChildDRP.GetName(), session.Dev, session.ChildDRP.Freq, session.ChildDRP.IsLooping())
+type DrpPlayer struct {
+	session *datatypes.DB_session
+	errs    []error
+	tc      *trafficcontrol.TrafficControl
+	r       util.RoutineReport
+}
 
-	TC := trafficcontrol.NewTrafficControl(session.Dev)
-	time.Sleep(time.Duration(session.ChildDRP.WarmupTimeMs) * time.Millisecond)
-
-	// flag to wait until end of thread
+func NewDrpPlayer(session *datatypes.DB_session) *DrpPlayer {
 	var wg sync.WaitGroup
-	err := TC.Init(trafficcontrol.TrafficControlStartParams{
-		Datarate:     uint32(session.ChildDRP.Peek()),
-		QueueSize:    int(session.Queuesizepackets),
-		AddonLatency: int(session.ExtralatencyMs),
-		Markfree:     int(session.Markfree),
-		Markfull:     int(session.Markfull),
+	d := &DrpPlayer{
+		session: session,
+		errs:    make([]error, 0, 5),
+		r: util.RoutineReport{
+			Wg:                       &wg,
+			On_extern_exit_c:         make(chan uint8),
+			Send_error_c:             make(chan error),
+			Application_has_finished: make(chan string),
 	},
-		trafficcontrol.NftStartParams{
-			L4sPremarking: session.L4sEnablePreMarking,
-			SignalStart:   session.SignalDrpStart,
-		})
-	if err != nil {
-		FATAL.Exit(err)
 	}
-	wg.Add(1)
+	return d
+}
+func (s *DrpPlayer) Start() error {
 	go func() {
 		err := TC.LaunchChangeLoop(
 			time.Duration(1000/session.ChildDRP.Freq)*time.Millisecond,

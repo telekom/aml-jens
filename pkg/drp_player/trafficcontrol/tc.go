@@ -28,9 +28,9 @@ import (
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/commands"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
+	"github.com/telekom/aml-jens/internal/util"
 
 	"os"
-	"sync"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/errortypes"
@@ -168,33 +168,46 @@ func (tc *TrafficControl) ChangeTo(rate float64) error {
 }
 
 // Starts a goroutine that will change the current bandwidth restriciton.
-// A change will occur after the waitTime is exceeded
-func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, wg *sync.WaitGroup, drp *datatypes.DB_data_rate_pattern) error {
-	defer wg.Done()
+// A change will occur after the waitTime is exceeded.
+//
+// # Uses util.RoutineReport
+//
+// Blockig - also spawns 1 short lived routine
+func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatypes.DB_data_rate_pattern, r util.RoutineReport) {
 	ticker := time.NewTicker(waitTime)
 	INFO.Println("start playing DataRatePattern")
 	if tc.nft.SignalStart {
-		ResetECTMarking(assets.NFT_TABLE_SIGNAL)
-		CreateNftRuleECT(tc.dev, assets.NFT_TABLE_SIGNAL, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect0", "1")
 		go func() {
+			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
+			CreateNftRuleECT(tc.dev, assets.NFT_TABLE_SIGNAL, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect0", "1")
 			<-time.NewTimer(200 * time.Millisecond).C
 			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
 		}()
 	}
-	for range ticker.C {
-		value, err := drp.Next()
-		if err != nil {
-			if _, ok := err.(*errortypes.IterableStopError); ok {
-				DEBUG.Println("Pattern finished")
-				break
-			} else {
-				FATAL.Println(err)
+	for {
+		select {
+		case <-r.On_extern_exit_c:
+			r.Wg.Done()
+			return
+		case <-ticker.C:
+			value, err := drp.Next()
+			if err != nil {
+				if _, ok := err.(*errortypes.IterableStopError); ok {
+					r.Application_has_finished <- "DataRatePattern has finished"
+					r.Wg.Done()
+					return
+				} else {
+					r.Send_error_c <- fmt.Errorf("LaunchChangeLoop could retrieve next Value: %w", err)
+					r.Wg.Done()
+					return
+				}
+			}
+			//change data rate in control file
+			if err := tc.ChangeTo(value); err != nil {
+				r.Send_error_c <- fmt.Errorf("LaunchChangeLoop could not change Value: %w", err)
+				r.Wg.Done()
+				return
 			}
 		}
-		//change data rate in control file
-		if err := tc.ChangeTo(value); err != nil {
-			return err
-		}
 	}
-	return nil
 }
