@@ -160,33 +160,32 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 	go persistor.Run(r, chan_pers_sample)
 	var fdint C.int = C.int(uint(file.Fd()))
 	pfd := C.struct_pollfd{fdint, C.POLLIN, 0}
+	//Helper function
+	done := func() {
+		persistor.Close()
+		r.Wg.Done()
+	}
 	r.Wg.Add(1)
 	go func() {
 		for {
 			select {
 			case <-r.On_extern_exit_c:
 				DEBUG.Println("Closing measuresession")
-				persistor.Close()
-				r.Wg.Done()
+				done()
 				return
 			case <-time.After(10 * time.Millisecond):
 				rc := C.poll(&pfd, 1, 9)
 				if rc > 0 {
 					bytesRead, err := file.Read(recordArray)
 					if err == io.EOF {
-						INFO.Println("")
 						INFO.Println("EOF")
-						INFO.Println("")
 					}
 					chan_poll_result <- bytesRead
 				}
 			}
 		}
 	}()
-	done := func() {
-		persistor.Close()
-		r.Wg.Done()
-	}
+
 	for {
 		select {
 
@@ -206,7 +205,7 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 					r.Send_error_c <- err
 					done()
 					return
-					}
+				}
 				chan_pers_sample <- *queueMeasure
 			case RECORD_TYPE_P:
 				packetMeasure, err := recordArray.AsPacketMeasure(session.Session_id)
@@ -214,7 +213,7 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 					r.Send_error_c <- err
 					done()
 					return
-					}
+				}
 				if packetMeasure == nil {
 					INFO.Printf("non ip packet ignored\n")
 				} else {
@@ -222,7 +221,7 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 				}
 			default:
 				WARN.Printf("Cant Parse recordarray %v: unknown type", recordArray)
-				}
+			}
 
 			recordCount++
 		}
@@ -275,9 +274,7 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 		}
 	}()
 	defer func() {
-		DEBUG.Println("Defer persist_samples <- exitStruct{}  PRE")
 		persist_samples <- exitStruct{}
-		DEBUG.Println("Defer persist_samples <- exitStruct{}  POST")
 	}()
 	for {
 		select {
@@ -424,7 +421,7 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}, r 
 						r.Wg.Done()
 						return
 					default:
-						FATAL.Println("Unexpected Input in persistMeasures")
+						FATAL.Printf("Unexpected Input in persistMeasures: %+v", sampleInterface)
 					}
 				default:
 					readSamples = false

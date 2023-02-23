@@ -52,8 +52,8 @@ func execCmdOutput(cmd *exec.Cmd) (string, error) {
 	err := cmd.Run()
 	if err != nil {
 		message := fmt.Sprintf("error exec command %s error: %s\n", cmd, err.Error())
-		INFO.Print(message)
-		INFO.Println(out.String())
+		DEBUG.Print(message)
+		DEBUG.Println(out.String())
 		return "", err
 	}
 	return out.String(), nil
