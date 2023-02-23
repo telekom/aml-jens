@@ -22,16 +22,16 @@
 package measuresession
 
 /*
-#include "stdio.h"
-#include "stdlib.h"
-#include "poll.h"
-#include <time.h>
-static unsigned long long get_nsecs(void)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (unsigned long long)ts.tv_sec * 1000000000UL + ts.tv_nsec;
-}
+ #include "stdio.h"
+ #include "stdlib.h"
+ #include "poll.h"
+ #include <time.h>
+ static unsigned long long get_nsecs(void)
+ {
+	 struct timespec ts;
+	 clock_gettime(CLOCK_MONOTONIC, &ts);
+	 return (unsigned long long)ts.tv_sec * 1000000000UL + ts.tv_nsec;
+ }
 */
 import "C"
 import (
@@ -43,13 +43,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/persistence"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
+	"github.com/telekom/aml-jens/internal/util"
 	"github.com/telekom/aml-jens/pkg/drp_player/trafficcontrol"
 )
 
@@ -163,13 +163,20 @@ type exitStruct struct{}
 
 var WaitGroup sync.WaitGroup
 
-func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, channel_close chan struct{}) {
+// Start the measuresession
+//
+// # Uses util.RoutineReport
+//
+// Blocking - spawns 3 (three)  more goroutines, adds them to wg
+func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r util.RoutineReport) {
 	// open memory file stream
 	recordArray := make([]byte, RECORD_SIZE)
 	INFO.Println("start measure session")
 	var file, err = os.Open(MM_FILE)
 	if err != nil {
-		FATAL.Exit(err)
+		r.Send_error_c <- err
+		r.Wg.Done()
+		return
 	}
 	defer file.Close()
 
@@ -183,94 +190,125 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, cha
 	// start aggregate and persist threads with communication channels
 	chan_pers_measure := make(chan PacketMeasure, 10000)
 	chan_pers_sample := make(chan interface{}, 10000)
-
-	WaitGroup.Add(2)
-	go aggregateMeasures(session, chan_pers_measure, chan_pers_sample, channel_close, diffTimeMs, tc)
-	go persistMeasures(session, chan_pers_sample)
-
+	chan_poll_result := make(chan int)
+	persistor, err := NewMeasureSessionPersistor(session)
+	if err != nil {
+		r.Send_error_c <- err
+		r.Wg.Done()
+		return
+	}
+	r.Wg.Add(2)
+	go aggregateMeasures(session, chan_pers_measure, chan_pers_sample, diffTimeMs, tc, r)
+	go persistor.Run(r, chan_pers_sample)
 	var fdint C.int = C.int(uint(file.Fd()))
 	pfd := C.struct_pollfd{fdint, C.POLLIN, 0}
-	for {
-		// poll fd
-		rc := C.poll(&pfd, 1, -1)
-		if rc > 0 {
-			// read one record of either packet or queue type
-			bytesRead, _ := file.Read(recordArray)
-			if err == io.EOF {
-				INFO.Println("")
-				INFO.Println("EOF")
-				INFO.Println("")
-			}
-
-			if bytesRead == 64 {
-				timestampMs := uint64(binary.LittleEndian.Uint64(recordArray[0:8])) / 1e6
-				packetType := recordArray[8]
-
-				if packetType == PACKET_DATA {
-					sojournTimeMs := uint32(binary.LittleEndian.Uint32(recordArray[12:16])) / 1e3
-					ecnIn := recordArray[9] & 3
-					ecnOut := (recordArray[9] & 24) >> 3
-					ecnValid := (recordArray[9] & TC_JENS_RELAY_ECN_VALID) != 0
-					slow := (recordArray[9] & TC_JENS_RELAY_SOJOURN_SLOW) != 0
-					mark := (recordArray[9] & TC_JENS_RELAY_SOJOURN_MARK) != 0
-					drop := (recordArray[9] & TC_JENS_RELAY_SOJOURN_DROP) != 0
-					ipVersion := recordArray[52]
-					srcIp := fmt.Sprintf("%d.%d.%d.%d", uint8(recordArray[28]), uint8(recordArray[29]), uint8(recordArray[30]), uint8(recordArray[31]))
-					dstIp := fmt.Sprintf("%d.%d.%d.%d", uint8(recordArray[44]), uint8(recordArray[45]), uint8(recordArray[46]), uint8(recordArray[47]))
-					packetSize := uint32(binary.LittleEndian.Uint32(recordArray[48:52]))
-					nextHdr := recordArray[53]
-					var srcPort uint16 = 0
-					var dstPort uint16 = 0
-					if nextHdr == 6 || nextHdr == 17 {
-						srcPort = uint16(binary.LittleEndian.Uint16(recordArray[54:56]))
-						dstPort = uint16(binary.LittleEndian.Uint16(recordArray[56:58]))
+	r.Wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-r.On_extern_exit_c:
+				DEBUG.Println("Closing measuresession")
+				persistor.Close()
+				r.Wg.Done()
+				return
+			case <-time.After(10 * time.Millisecond):
+				rc := C.poll(&pfd, 1, 9)
+				if rc > 0 {
+					bytesRead, err := file.Read(recordArray)
+					if err == io.EOF {
+						INFO.Println("")
+						INFO.Println("EOF")
+						INFO.Println("")
 					}
-					if srcIp != "0.0.0.0" && dstIp != "0.0.0.0" {
-						flow := datatypes.DB_network_flow{
-							Source_ip:        srcIp,
-							Source_port:      srcPort,
-							Destination_ip:   dstIp,
-							Destination_port: dstPort,
-							Session_id:       session.Session_id,
-						}
-						packetMeasure := PacketMeasure{
-							timestampMs:    timestampMs,
-							sojournTimeMs:  sojournTimeMs,
-							ecnIn:          ecnIn,
-							ecnOut:         ecnOut,
-							ecnValid:       ecnValid,
-							slow:           slow,
-							mark:           mark,
-							drop:           drop,
-							ipVersion:      ipVersion,
-							packetSizeByte: packetSize,
-							net_flow:       &flow,
-						}
-						chan_pers_measure <- packetMeasure
-					} else {
-						INFO.Printf("non ip packet ignored\n")
-					}
-				} else if packetType == QUEUE_DATA {
-					// to do: persistance
-					numberOfPacketsInQueue := uint16(binary.LittleEndian.Uint16(recordArray[10:12]))
-					memUsageBytes := uint32(binary.LittleEndian.Uint32(recordArray[12:16]))
-					currentEpochMs := timestampMs + diffTimeMs
-					queueMeasure := DB_measure_queue{
-						Time:              currentEpochMs,
-						Memoryusagebytes:  memUsageBytes,
-						PacketsInQueue:    numberOfPacketsInQueue,
-						Fk_session_tag_id: session.Session_id,
-					}
-
-					chan_pers_sample <- queueMeasure
+					chan_poll_result <- bytesRead
 				}
-				recordCount++
 			}
+		}
+	}()
+	for {
+		select {
+		case <-r.On_extern_exit_c:
+			DEBUG.Println("Closing measuresession - recordarray parser")
+			persistor.Close()
+			r.Wg.Done()
+			return
+		case bytesRead := <-chan_poll_result:
+			// read one record of either packet or queue type
+			if bytesRead != 64 {
+				continue
+			}
+			timestampMs := uint64(binary.LittleEndian.Uint64(recordArray[0:8])) / 1e6
+			packetType := recordArray[8]
+
+			if packetType == PACKET_DATA {
+				sojournTimeMs := uint32(binary.LittleEndian.Uint32(recordArray[12:16])) / 1e3
+				ecnIn := recordArray[9] & 3
+				ecnOut := (recordArray[9] & 24) >> 3
+				ecnValid := (recordArray[9] & TC_JENS_RELAY_ECN_VALID) != 0
+				slow := (recordArray[9] & TC_JENS_RELAY_SOJOURN_SLOW) != 0
+				mark := (recordArray[9] & TC_JENS_RELAY_SOJOURN_MARK) != 0
+				drop := (recordArray[9] & TC_JENS_RELAY_SOJOURN_DROP) != 0
+				ipVersion := recordArray[52]
+				srcIp := fmt.Sprintf("%d.%d.%d.%d", uint8(recordArray[28]), uint8(recordArray[29]), uint8(recordArray[30]), uint8(recordArray[31]))
+				dstIp := fmt.Sprintf("%d.%d.%d.%d", uint8(recordArray[44]), uint8(recordArray[45]), uint8(recordArray[46]), uint8(recordArray[47]))
+				packetSize := uint32(binary.LittleEndian.Uint32(recordArray[48:52]))
+				nextHdr := recordArray[53]
+				var srcPort uint16 = 0
+				var dstPort uint16 = 0
+				if nextHdr == 6 || nextHdr == 17 {
+					srcPort = uint16(binary.LittleEndian.Uint16(recordArray[54:56]))
+					dstPort = uint16(binary.LittleEndian.Uint16(recordArray[56:58]))
+				}
+				if srcIp != "0.0.0.0" && dstIp != "0.0.0.0" {
+					flow := datatypes.DB_network_flow{
+						Source_ip:        srcIp,
+						Source_port:      srcPort,
+						Destination_ip:   dstIp,
+						Destination_port: dstPort,
+						Session_id:       session.Session_id,
+					}
+					packetMeasure := PacketMeasure{
+						timestampMs:    timestampMs,
+						sojournTimeMs:  sojournTimeMs,
+						ecnIn:          ecnIn,
+						ecnOut:         ecnOut,
+						ecnValid:       ecnValid,
+						slow:           slow,
+						mark:           mark,
+						drop:           drop,
+						ipVersion:      ipVersion,
+						packetSizeByte: packetSize,
+						net_flow:       &flow,
+					}
+					chan_pers_measure <- packetMeasure
+				} else {
+					INFO.Printf("non ip packet ignored\n")
+				}
+			} else if packetType == QUEUE_DATA {
+				// to do: persistance
+				numberOfPacketsInQueue := uint16(binary.LittleEndian.Uint16(recordArray[10:12]))
+				memUsageBytes := uint32(binary.LittleEndian.Uint32(recordArray[12:16]))
+				currentEpochMs := timestampMs + diffTimeMs
+				queueMeasure := DB_measure_queue{
+					Time:              currentEpochMs,
+					Memoryusagebytes:  memUsageBytes,
+					PacketsInQueue:    numberOfPacketsInQueue,
+					Fk_session_tag_id: session.Session_id,
+				}
+
+				chan_pers_sample <- queueMeasure
+			}
+			recordCount++
 		}
 	}
 }
 
-func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasure, persist_samples chan interface{}, channel_exit chan struct{}, diffTimeMs uint64, tc *trafficcontrol.TrafficControl) {
+// Start the measuresession
+//
+// # Uses util.RoutineReport
+//
+// Blocking - spawns 1 (one)  more goroutine, adds them to wg
+func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasure, persist_samples chan interface{}, diffTimeMs uint64, tc *trafficcontrol.TrafficControl, r util.RoutineReport) {
 	sampleDuration := SAMPLE_DURATION_MS * time.Millisecond
 	ticker := time.NewTicker(sampleDuration)
 	//Use of sync.Map instead of map:
@@ -280,28 +318,22 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 	if session.ParentBenchmark.PrintToStdOut {
 		fmt.Println(strings.Join(assets.CONST_HEADING, " "))
 	}
-	doExit := false
-	for range ticker.C {
-		mapMeasures := make(map[string]*AggregateMeasure)
-		readMessages := true
-		message := <-messages
-		packetStartTimeMs := message.timestampMs
-		for readMessages {
+	r.Wg.Add(1)
+	go func() {
+		p, err := persistence.GetPersistence()
+		if err != nil {
+			r.Send_error_c <- fmt.Errorf("aggregateMeasure: %w", err)
+			r.Wg.Done()
+			return
+		}
+		for {
 			select {
-			case <-channel_exit:
-				INFO.Println("Closing aggregateMeasures")
-				readMessages = false
-				doExit = true
-				break
-
-			case message = <-messages: // Aggregate Measure
-				diffMs := int64(message.timestampMs - packetStartTimeMs)
-				if diffMs > sampleDuration.Milliseconds() {
-					readMessages = false
-				}
-				// update measure sample
-				p, err := persistence.GetPersistence()
-				if err != nil {
+			case <-r.On_extern_exit_c:
+				DEBUG.Println("Closing aggregateMeasures - writer")
+				r.Wg.Done()
+				return
+			case single_packet_measure := <-messages:
+				if err := (*p).Persist(single_packet_measure.net_flow); err != nil {
 					FATAL.Exit(err)
 				}
 				measure, _ := mapMeasures.LoadOrStore(single_packet_measure.net_flow.MeasureIdStr(), NewAggregateMeasure(single_packet_measure.net_flow))
@@ -313,22 +345,30 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 					return
 				}
 				m.add(&single_packet_measure, tc.CurrentRate())
-				}
-
-				measure.add(&message, tc.CurrentRate())
-
-			default:
-				readMessages = false
 			}
+		}
+	}()
+	defer func() {
+		DEBUG.Println("Defer persist_samples <- exitStruct{}  PRE")
+		persist_samples <- exitStruct{}
+		DEBUG.Println("Defer persist_samples <- exitStruct{}  POST")
+	}()
+	for {
+		select {
+		case <-r.On_extern_exit_c:
+			DEBUG.Println("Closing aggregateMeasures - reader")
+			r.Wg.Done()
+			return
+		case <-ticker.C:
 			mapMeasures.Range(func(key any, value any) bool {
 				aggregated_measure, ok := value.(*AggregateMeasure)
 				if !ok {
 					WARN.Println("Can NOT iterate Measures, got invalid value.")
 					return false
-		}
-			if aggregated_measure.sampleCount == 0 {
+				}
+				if aggregated_measure.sampleCount == 0 {
 					return true
-			}
+				}
 				currentEpochMs := time.Now().UnixNano()/(int64(time.Millisecond)/int64(time.Nanosecond)) - 5
 
 				sample := aggregated_measure.toDB_measure_packet(uint64(currentEpochMs))
@@ -341,16 +381,16 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 					}
 					INFO.Printf("Not Persisting: %+v", sample)
 					return true
-			}
-			persist_samples <- sample
-			if session.ParentBenchmark.PrintToStdOut {
+				}
+				persist_samples <- sample
+				if session.ParentBenchmark.PrintToStdOut {
 					if err := sample.PrintLine(aggregated_measure.net_flow.MeasureIdStr()); err != nil {
 						WARN.Println("Could not write Measurement")
 						r.Send_error_c <- err
 						r.Wg.Done()
 						return false
+					}
 				}
-			}
 				return true
 			})
 			mapMeasures.Range(func(key, value any) bool {
@@ -361,12 +401,12 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 	}
 }
 
-func persistMeasures(session *datatypes.DB_session, samples chan interface{}) {
+func persistMeasures(session *datatypes.DB_session, samples chan interface{}, r util.RoutineReport) {
 	tickerPersist := time.NewTicker(1 * time.Second)
 
 	var db, err = persistence.GetPersistence()
 	if err != nil {
-		FATAL.Exit(err)
+		r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
 	}
 	//var db sql.DB
 	// create session tag
@@ -385,95 +425,99 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}) {
 				INFO.Printf("storing csv measures in directory %s \n", session.Name)
 				err = os.Mkdir(session.Name, os.ModeDir)
 				if err != nil {
-					FATAL.Println(err)
+					r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
 				}
 			}
 		}
 
 		csvFile, err = os.Create(filepath.Join(session.Name, filepath.Base("measure_packet.csv")))
 		if err != nil {
-			FATAL.Exitln("failed to create csv file", err)
+			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
 		}
 		defer csvFile.Close()
 		csvWriter = csv.NewWriter(csvFile)
 		heading := assets.CONST_HEADING
 		if err := csvWriter.Write(heading); err != nil {
-			FATAL.Exitln("error writing heading to csv file", err)
+			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
 		}
 
 		csvQueueFile, err = os.Create(filepath.Join(session.Name, filepath.Base("measure_queue.csv")))
 		if err != nil {
-			FATAL.Exitln("failed to create queue csv file", err)
+			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
 		}
 		defer csvQueueFile.Close()
 		csvQueueWriter = csv.NewWriter(csvQueueFile)
 		heading = []string{"timestampMs", "memUsageBytes", "packetsinqueue"}
 		if err := csvQueueWriter.Write(heading); err != nil {
-			FATAL.Exitln("error writing heading to queue csv file", err)
+			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
 		}
 	}
+	for {
+		select {
+		case <-r.On_extern_exit_c:
+			r.Wg.Done()
+			return
+		case <-tickerPersist.C: //start := time.Now()
 
-	for range tickerPersist.C {
-		//start := time.Now()
-
-		readSamples := true
-		var samplePacketCount uint32 = 0
-		var sampleQueueCount uint32 = 0
-		var avgLoadKbits uint32 = 0
-		for readSamples {
-			select {
-			case sampleInterface := <-samples:
-				switch sample := sampleInterface.(type) {
-				// write measure to db
-				case DB_measure_packet:
-					if err := (*db).Persist(sample); err != nil {
-						FATAL.Exit(err)
-					}
-
-					if session.ParentBenchmark.CsvOuptut {
-						if err := csvWriter.Write(sample.CsvRecord()); err != nil {
-							FATAL.Exitln("error writing record to csv file", err)
+			readSamples := true
+			var samplePacketCount uint32 = 0
+			var sampleQueueCount uint32 = 0
+			var avgLoadKbits uint32 = 0
+			for readSamples {
+				select {
+				case sampleInterface := <-samples:
+					switch sample := sampleInterface.(type) {
+					// write measure to db
+					case DB_measure_packet:
+						if err := (*db).Persist(sample); err != nil {
+							FATAL.Exit(err)
 						}
-					}
 
-					avgLoadKbits += sample.LoadKbits
-					samplePacketCount++
-				case DB_measure_queue:
-					if err := (*db).Persist(&sample); err != nil {
-						FATAL.Exitf("---Persist(%+v) -> %s", sample, err)
-					}
-
-					if session.ParentBenchmark.CsvOuptut {
-						if err := csvQueueWriter.Write(sample.CsvRecord()); err != nil {
-							FATAL.Exitln("error writing record to queue csv file", err)
+						if session.ParentBenchmark.CsvOuptut {
+							if err := csvWriter.Write(sample.CsvRecord()); err != nil {
+								FATAL.Exitln("error writing record to csv file", err)
+							}
 						}
-					}
 
-					sampleQueueCount++
-				case exitStruct:
-					INFO.Println("Exiting persistMeasures")
-					WaitGroup.Done()
-					return
+						avgLoadKbits += sample.LoadKbits
+						samplePacketCount++
+					case DB_measure_queue:
+						if err := (*db).Persist(&sample); err != nil {
+							FATAL.Exitf("---Persist(%+v) -> %s", sample, err)
+						}
+
+						if session.ParentBenchmark.CsvOuptut {
+							if err := csvQueueWriter.Write(sample.CsvRecord()); err != nil {
+								FATAL.Exitln("error writing record to queue csv file", err)
+							}
+						}
+
+						sampleQueueCount++
+					case exitStruct:
+						INFO.Println("Exiting persistMeasures: due to struct")
+						r.Wg.Done()
+						return
+					default:
+						FATAL.Println("Unexpected Input in persistMeasures")
+					}
 				default:
-					FATAL.Println("Unexpected Input in persistMeasures")
+					readSamples = false
 				}
-			default:
-				readSamples = false
 			}
-		}
-		(*db).Commit()
-		//to csv
-		if session.ParentBenchmark.CsvOuptut {
-			csvWriter.Flush()
-			csvQueueWriter.Flush()
-		}
+			(*db).Commit()
+			//to csv
+			if session.ParentBenchmark.CsvOuptut {
+				csvWriter.Flush()
+				csvQueueWriter.Flush()
+			}
 
-		//durationMs := time.Now().UnixMicro() - start.UnixMicro()
+			//durationMs := time.Now().UnixMicro() - start.UnixMicro()
 
-		if samplePacketCount > 0 {
-			//avgTimePersistPerMeasure := durationMs / int64(samplePacketCount)
-			avgLoadKbits /= samplePacketCount
-			//INFO.Printf("samples persisted: type packet %d type queue %d avg time %d us avg load %d\n", samplePacketCount, sampleQueueCount, avgTimePersistPerMeasure, avgLoadKbits)
+			if samplePacketCount > 0 {
+				//avgTimePersistPerMeasure := durationMs / int64(samplePacketCount)
+				avgLoadKbits /= samplePacketCount
+				//INFO.Printf("samples persisted: type packet %d type queue %d avg time %d us avg load %d\n", samplePacketCount, sampleQueueCount, avgTimePersistPerMeasure, avgLoadKbits)
+			}
 		}
 	}
 }
