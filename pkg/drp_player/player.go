@@ -39,72 +39,99 @@ func NewDrpPlayer(session *datatypes.DB_session) *DrpPlayer {
 			On_extern_exit_c:         make(chan uint8),
 			Send_error_c:             make(chan error),
 			Application_has_finished: make(chan string),
-	},
+		},
 	}
 	return d
 }
 func (s *DrpPlayer) Start() error {
 	go func() {
-		err := TC.LaunchChangeLoop(
-			time.Duration(1000/session.ChildDRP.Freq)*time.Millisecond,
-			&wg,
-			session.ChildDRP,
-		)
-		if err != nil {
-			FATAL.Println(err)
+		//Exit listener
+		select {
+		case msg := <-s.r.Application_has_finished:
+			INFO.Println(msg)
+			DEBUG.Println("Exiting: Application_has_finished")
+			s.Exit()
+		case <-s.r.On_extern_exit_c:
+			//Send exit signal to all
+			INFO.Println("DrPlay was asked to quit")
+		case err := <-s.r.Send_error_c:
+			WARN.Printf("Something went wrong during DrPlay: %v", err)
+			//Something went wrong exit signal to all
+			s.errs = append(s.errs, err)
+			return
 		}
 	}()
+	logging.LinkExitFunction(func() uint8 {
+		s.r.Send_error_c <- fmt.Errorf("FATAL")
+		os.Exit(-1)
+		return 255
+	}, 2500)
+	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", s.session.ChildDRP.GetName(), s.session.Dev, s.session.ChildDRP.Freq, s.session.ChildDRP.IsLooping())
 
-	DEBUG.Println("... in background")
-	done := registerExitHandler(&wg, exit_handler_channel, session, TC)
-	// start measure session
-	if !session.ChildDRP.Nomeasure {
-		go measuresession.Start(session, TC, g_channel_exit)
+	if err := s.launchTC(); err != nil {
+		return err
 	}
-	INFO.Println("[][][][][][][][] Waiting")
-	wg.Wait()
-	exit_handler_channel <- syscall.SIGQUIT
-	INFO.Println("[][][][][][][][] Sending quit")
-	measuresession.WaitGroup.Wait()
-	INFO.Println("[][][][][][][][] Waiting 2.")
-	//Wait for ExitHandler
-	<-done
-	INFO.Println("[][][][][][][][] DONE")
-	INFO.Println(strings.Join(assets.END_OF_DRPLAY[:], " "))
+	// flag to wait until end of thread
+	DEBUG.Println("... in background")
+	//registerExitHandler(&wg, chans, session, TC)
+	// start measure session
+	if !s.session.ChildDRP.Nomeasure {
+		s.r.Wg.Add(1)
+		go measuresession.Start(s.session, s.tc, s.r)
+	}
+
+	return nil
 }
-
-// Creates a function that, on SIGINT i.e. Ctrl + c resets the dev using TC
-// It does not write to console nor does it return anything
-func registerExitHandler(wg *sync.WaitGroup, c chan os.Signal, session *datatypes.DB_session, tc *trafficcontrol.TrafficControl) (done chan uint8) {
-	done = make(chan uint8)
-	go func() {
-		sig := <-c
-		INFO.Printf("Received signal: %+v\n", sig)
-		session.ChildDRP.SetToDone()
-		if !session.ChildDRP.Nomeasure {
-			DEBUG.Println("Sending Quit msg")
-			go func() { g_channel_exit <- struct{}{} }()
-		}
-
-		wg.Wait()
-		DEBUG.Println("All threads quit")
-
-		err := tc.Close()
+func (s *DrpPlayer) exit_clean() {
+	if err := s.tc.Close(); err != nil {
+		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
+	}
+	if !s.session.ChildDRP.Nomeasure {
+		p_ptr, err := persistence.GetPersistence()
 		if err != nil {
-			INFO.Printf("Error closting TrafficControl: %+v", err)
+			WARN.Printf("Exit: Could not get persistence %+v", err)
 		}
-		measuresession.WaitGroup.Wait()
-		if !session.ChildDRP.Nomeasure {
-			p_ptr, err := persistence.GetPersistence()
-			if err != nil {
-				FATAL.Exit(err)
-			}
-			(*p_ptr).Commit()
+		(*p_ptr).Commit()
+		if err := (*p_ptr).Close(); err != nil {
+			WARN.Printf("Exit: Could not close persistence %+v", err)
 		}
-
-		//TODO: On exit write all db objects to db
-		DEBUG.Println("Program->Exit")
-		done <- 0
-	}()
-	return done
+	}
+	fmt.Println(strings.Join(assets.END_OF_DRPLAY[:], " "))
+}
+func (s *DrpPlayer) Wait() {
+	s.r.Wg.Wait()
+}
+func (s *DrpPlayer) Exit() {
+	DEBUG.Println("Exiting")
+	close(s.r.On_extern_exit_c)
+	DEBUG.Println("Waiting")
+	s.Wait()
+	DEBUG.Println("exit_clean")
+	s.exit_clean()
+	DEBUG.Println("Player has exited")
+}
+func (s *DrpPlayer) launchTC() error {
+	s.tc = trafficcontrol.NewTrafficControl(s.session.Dev)
+	time.Sleep(time.Duration(s.session.ChildDRP.WarmupTimeMs) * time.Millisecond)
+	err := s.tc.Init(trafficcontrol.TrafficControlStartParams{
+		Datarate:     uint32(s.session.ChildDRP.Peek()),
+		QueueSize:    int(s.session.Queuesizepackets),
+		AddonLatency: int(s.session.ExtralatencyMs),
+		Markfree:     int(s.session.Markfree),
+		Markfull:     int(s.session.Markfull),
+	},
+		trafficcontrol.NftStartParams{
+			L4sPremarking: s.session.L4sEnablePreMarking,
+			SignalStart:   s.session.SignalDrpStart,
+		})
+	if err != nil {
+		return err
+	}
+	s.r.Wg.Add(1)
+	go s.tc.LaunchChangeLoop(
+		time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
+		s.session.ChildDRP,
+		s.r,
+	)
+	return nil
 }
