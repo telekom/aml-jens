@@ -130,6 +130,7 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 	INFO.Println("start measure session")
 	var file, err = os.Open(MM_FILE)
 	if err != nil {
+		FATAL.Println("Could not open MM_FILE")
 		r.Send_error_c <- err
 		r.Wg.Done()
 		return
@@ -149,13 +150,16 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 	chan_poll_result := make(chan int)
 	persistor, err := NewMeasureSessionPersistor(session)
 	if err != nil {
+		FATAL.Println("Could not create Persistor")
 		r.Send_error_c <- err
 		r.Wg.Done()
 		return
 	}
-	r.Wg.Add(2)
-	go aggregateMeasures(session, chan_pers_measure, chan_pers_sample, diffTimeMs, tc, r)
+	r.Wg.Add(1)
 	go persistor.Run(r, chan_pers_sample)
+	r.Wg.Add(1)
+	go aggregateMeasures(session, chan_pers_measure, chan_pers_sample, diffTimeMs, tc, r)
+
 	var fdint C.int = C.int(uint(file.Fd()))
 	pfd := C.struct_pollfd{fdint, C.POLLIN, 0}
 	//Helper function
@@ -169,7 +173,7 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 			select {
 			case <-r.On_extern_exit_c:
 				DEBUG.Println("Closing measuresession")
-				done()
+				r.Wg.Done()
 				return
 			case <-time.After(10 * time.Millisecond):
 				rc := C.poll(&pfd, 1, 9)
@@ -178,7 +182,14 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 					if err == io.EOF {
 						INFO.Println("EOF")
 					}
-					chan_poll_result <- bytesRead
+					select {
+					case chan_poll_result <- bytesRead:
+						//Good
+					default:
+						// chan_poll_result does not get polled
+						DEBUG.Println("Throwing away poll event")
+					}
+
 				}
 			}
 		}
@@ -200,6 +211,7 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 			case RECORD_TYPE_Q:
 				queueMeasure, err := recordArray.AsDB_measure_queue(diffTimeMs, session.Session_id)
 				if err != nil {
+					WARN.Println("Could not format record as MQ")
 					r.Send_error_c <- err
 					done()
 					return
@@ -208,6 +220,7 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r u
 			case RECORD_TYPE_P:
 				packetMeasure, err := recordArray.AsPacketMeasure(session.Session_id)
 				if err != nil {
+					WARN.Println("Could not format record as MP")
 					r.Send_error_c <- err
 					done()
 					return
@@ -388,12 +401,13 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}, r 
 					// write measure to db
 					case DB_measure_packet:
 						if err := (*db).Persist(sample); err != nil {
-							FATAL.Exit(err)
+							r.Send_error_c <- fmt.Errorf("could not persist MP: %w", err)
+							//FATAL.Exit(err)
 						}
 
 						if session.ParentBenchmark.CsvOuptut {
 							if err := csvWriter.Write(sample.CsvRecord()); err != nil {
-								FATAL.Exitln("error writing record to csv file", err)
+								r.Send_error_c <- fmt.Errorf("could write MP to csv: %w", err)
 							}
 						}
 
@@ -401,12 +415,12 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}, r 
 						samplePacketCount++
 					case DB_measure_queue:
 						if err := (*db).Persist(&sample); err != nil {
-							FATAL.Exitf("---Persist(%+v) -> %s", sample, err)
+							r.Send_error_c <- fmt.Errorf("could not persist MQ: %w", err)
 						}
 
 						if session.ParentBenchmark.CsvOuptut {
 							if err := csvQueueWriter.Write(sample.CsvRecord()); err != nil {
-								FATAL.Exitln("error writing record to queue csv file", err)
+								r.Send_error_c <- fmt.Errorf("could write MQ to csv: %w", err)
 							}
 						}
 

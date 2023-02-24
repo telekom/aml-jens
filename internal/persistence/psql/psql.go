@@ -56,11 +56,13 @@ func (s *DataBase) GetStmt() datatypes.SQLStmt {
 	return s.db
 }
 
+//go:inline
 func (s *DataBase) HasDBConnection() bool {
 	return s.db != nil
 }
 func (s *DataBase) Close() error {
-	if s.db != nil {
+	DEBUG.Println("Closing DB")
+	if !s.HasDBConnection() {
 		return s.db.Close()
 	}
 	return nil
@@ -164,7 +166,7 @@ func (s *DataBase) Persist(obj interface{}) error {
 func (s *DataBase) persist_measure_packet(data datatypes.DB_measure_packet) error {
 
 	if data.Fk_flow_id == -1 {
-		return errors.New("Trying to persist a meausre_packet without its Fk_flow_id set.")
+		return errors.New("trying to persist a meausre_packet without its Fk_flow_id set.")
 	}
 	if data.Capacitykbits == 0 {
 		//Do not persist samples where capacity is 0
