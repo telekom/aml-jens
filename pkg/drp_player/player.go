@@ -3,12 +3,9 @@ package drpplayer
 import "C"
 import (
 	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/persistence"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
@@ -17,9 +14,6 @@ import (
 	"github.com/telekom/aml-jens/pkg/drp_player/trafficcontrol"
 )
 
-const CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
-
-var g_channel_exit = make(chan struct{})
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DrpPlayer struct {
@@ -43,6 +37,19 @@ func NewDrpPlayer(session *datatypes.DB_session) *DrpPlayer {
 	}
 	return d
 }
+
+// Starts every component needed for the operation of Drplayer
+//
+// Includes, but is not limited to:
+//
+// - Persistence
+//   - csv &/ psql
+//
+// - Measure session
+//
+// - Data aggregation
+//
+// Non blocking
 func (s *DrpPlayer) Start() error {
 	go func() {
 		//Exit listener
@@ -61,20 +68,18 @@ func (s *DrpPlayer) Start() error {
 			return
 		}
 	}()
-	logging.LinkExitFunction(func() uint8 {
-		s.r.Send_error_c <- fmt.Errorf("FATAL")
-		os.Exit(-1)
-		return 255
-	}, 2500)
+
 	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", s.session.ChildDRP.GetName(), s.session.Dev, s.session.ChildDRP.Freq, s.session.ChildDRP.IsLooping())
 
-	if err := s.launchTC(); err != nil {
-		return err
+	if err := s.initTC(); err != nil {
+		return fmt.Errorf("initTC returned %w", err)
 	}
-	// flag to wait until end of thread
-	DEBUG.Println("... in background")
-	//registerExitHandler(&wg, chans, session, TC)
-	// start measure session
+	s.r.Wg.Add(1)
+	go s.tc.LaunchChangeLoop(
+		time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
+		s.session.ChildDRP,
+		s.r,
+	)
 	if !s.session.ChildDRP.Nomeasure {
 		s.r.Wg.Add(1)
 		go measuresession.Start(s.session, s.tc, s.r)
@@ -92,25 +97,24 @@ func (s *DrpPlayer) exit_clean() {
 			WARN.Printf("Exit: Could not get persistence %+v", err)
 		}
 		(*p_ptr).Commit()
-		if err := (*p_ptr).Close(); err != nil {
-			WARN.Printf("Exit: Could not close persistence %+v", err)
-		}
 	}
-	fmt.Println(strings.Join(assets.END_OF_DRPLAY[:], " "))
 }
 func (s *DrpPlayer) Wait() {
 	s.r.Wg.Wait()
+	DEBUG.Println("exit_clean")
+	s.exit_clean()
 }
 func (s *DrpPlayer) Exit() {
 	close(s.r.On_extern_exit_c)
 	DEBUG.Println("Waiting for routines to end")
 	s.Wait()
-	DEBUG.Println("exit_clean")
-	s.exit_clean()
 	DEBUG.Println("Player has exited")
 }
-func (s *DrpPlayer) launchTC() error {
+func (s *DrpPlayer) initTC() error {
 	s.tc = trafficcontrol.NewTrafficControl(s.session.Dev)
+	//Resetting qdisc
+	//might fail - ignore
+	_ = s.tc.Reset()
 	time.Sleep(time.Duration(s.session.ChildDRP.WarmupTimeMs) * time.Millisecond)
 	err := s.tc.Init(trafficcontrol.TrafficControlStartParams{
 		Datarate:     uint32(s.session.ChildDRP.Peek()),
@@ -126,11 +130,6 @@ func (s *DrpPlayer) launchTC() error {
 	if err != nil {
 		return err
 	}
-	s.r.Wg.Add(1)
-	go s.tc.LaunchChangeLoop(
-		time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
-		s.session.ChildDRP,
-		s.r,
-	)
+
 	return nil
 }
