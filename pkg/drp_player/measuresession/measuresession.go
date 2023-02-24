@@ -119,8 +119,6 @@ const SAMPLE_DURATION_MS = 10
 
 var bool2int = map[bool]int8{false: 0, true: 1}
 
-type exitStruct struct{}
-
 // Start the measuresession
 //
 // # Uses util.RoutineReport
@@ -273,9 +271,6 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 			}
 		}
 	}()
-	defer func() {
-		persist_samples <- exitStruct{}
-	}()
 	for {
 		select {
 		case <-r.On_extern_exit_c:
@@ -416,10 +411,6 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}, r 
 						}
 
 						sampleQueueCount++
-					case exitStruct:
-						INFO.Println("Exiting persistMeasures: due to struct")
-						r.Wg.Done()
-						return
 					default:
 						FATAL.Printf("Unexpected Input in persistMeasures: %+v", sampleInterface)
 					}
