@@ -105,9 +105,11 @@ func NewTrafficControl(dev string) *TrafficControl {
 	return tc
 }
 
+// Init sets NFT and TC to workable state, connects to custom qdisk.
+// After calling Init Close has to be called.
 func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartParams) error {
+	ResetECTMarking(assets.NFT_TABLE_PREMARK)
 	if nft.L4sPremarking {
-		ResetECTMarking(assets.NFT_TABLE_PREMARK)
 		CreateNftRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
 	}
 
@@ -130,14 +132,21 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	tc.control_file, err = os.OpenFile(CTRL_FILE, os.O_WRONLY, os.ModeAppend)
 	return err
 }
+
+// Returns the currently set data_rate
 func (tc *TrafficControl) CurrentRate() float64 {
 	return tc.current_data_rate
 }
+
+// Rests Qdisc to default
 func (tc *TrafficControl) Reset() error {
 	_, err := commands.ExecReturnOutput("tc", "qdisc", "delete", "dev", tc.dev, "root")
 	return err
 }
 
+// Closes all open contexts; Resets NFT_TABLE, tc markings etc.
+//
+// This function needs to be called after tc is Done.
 func (tc *TrafficControl) Close() error {
 	DEBUG.Println("Closing tc")
 	if tc.nft.L4sPremarking {
@@ -174,7 +183,7 @@ func (tc *TrafficControl) ChangeTo(rate float64) error {
 // Blockig - also spawns 1 short lived routine
 func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatypes.DB_data_rate_pattern, r util.RoutineReport) {
 	ticker := time.NewTicker(waitTime)
-	INFO.Println("start playing DataRatePattern")
+	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
 	if tc.nft.SignalStart {
 		go func() {
 			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
@@ -186,6 +195,7 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatype
 	for {
 		select {
 		case <-r.On_extern_exit_c:
+			DEBUG.Println("Closing TC-loop")
 			r.Wg.Done()
 			return
 		case <-ticker.C:
