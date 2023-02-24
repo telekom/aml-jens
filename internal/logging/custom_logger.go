@@ -22,9 +22,12 @@
 package logging
 
 import (
+	"fmt"
 	"io"
 	rlog "log"
 	"os"
+	"runtime"
+	"strings"
 	"time"
 )
 
@@ -80,20 +83,81 @@ func (clog *customLogger) Writer() io.Writer {
 
 // Exit calls l.Output to print to the logger and potentially exit. Arguments are handled in the manner of fmt.Print.
 func (clog *customLogger) Exit(v ...any) {
-	clog.logger.Print(v...)
+	_, file, lineNo, ok := runtime.Caller(1)
+	var b strings.Builder
+	t := time.Now()
+	fmt.Fprintf(&b, "%04d/%02d/%02d %02d:%02d:%02d.%d",
+		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond())
+
+	fmt.Fprintf(&b, " %s:%d: [FATAL] %s", file, lineNo, fmt.Sprint(v...))
+	for i := 2; i < 10 && ok; i++ {
+		_, file, lineNo, ok = runtime.Caller(i)
+		if !ok {
+			break
+		}
+		fmt.Fprintf(&b, "\n    -> %s:%d", file, lineNo)
+	}
+	b.WriteRune('\n')
+	//clog.logger.Print(v...)
+	fmt.Fprint(
+		clog.logger.Writer(),
+		b.String())
+	clog.logger.Println("The above exception has caused the program to exit.")
 	clog.do_exit()
+	clog.logger.Println("Term")
 }
 
 // Exitln calls l.Output to print to the logger and potentially exit. Arguments are handled in the manner of fmt.Println.
 func (clog *customLogger) Exitln(v ...any) {
-	clog.logger.Println(v...)
+	_, file, lineNo, ok := runtime.Caller(1)
+	var b strings.Builder
+	t := time.Now()
+	fmt.Fprintf(&b, "%04d/%02d/%02d %02d:%02d:%02d.%d",
+		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond())
+
+	fmt.Fprintf(&b, " %s:%d: [FATAL] %s", file, lineNo, fmt.Sprintln(v...))
+	for i := 2; i < 10 && ok; i++ {
+		_, file, lineNo, ok = runtime.Caller(i)
+		if !ok {
+			break
+		}
+		fmt.Fprintf(&b, "\n    -> %s:%d", file, lineNo)
+	}
+	b.WriteRune('\n')
+	//clog.logger.Print(v...)
+	fmt.Fprintln(
+		clog.logger.Writer(),
+		b.String())
+	clog.logger.Println("The above exception has caused the program to exit.")
 	clog.do_exit()
+	clog.logger.Println("Term")
 }
 
 // Exitf calls l.Output to print to the logger and potentially exit. Arguments are handled in the manner of fmt.Printf.
 func (clog *customLogger) Exitf(format string, v ...any) {
-	clog.logger.Printf(format, v...)
+	_, file, lineNo, ok := runtime.Caller(1)
+	var b strings.Builder
+	b.Grow(60)
+	t := time.Now()
+	fmt.Fprintf(&b, "%04d/%02d/%02d %02d:%02d:%02d.%d",
+		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond())
+
+	fmt.Fprintf(&b, " %s:%d: [FATAL] %s", file, lineNo, fmt.Sprintf(format, v...))
+	for i := 2; i < 10 && ok; i++ {
+		_, file, lineNo, ok = runtime.Caller(i)
+		if !ok {
+			break
+		}
+		fmt.Fprintf(&b, "\n    -> %s:%d", file, lineNo)
+	}
+	b.WriteRune('\n')
+	//clog.logger.Print(v...)
+	fmt.Fprintln(
+		clog.logger.Writer(),
+		b.String())
+	clog.logger.Println("The above exception has caused the program to exit.")
 	clog.do_exit()
+	clog.logger.Println("Term")
 }
 
 // Calls the set callback (exit); and waits for a set amount of time
