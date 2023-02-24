@@ -13,23 +13,24 @@ import (
 	"github.com/telekom/aml-jens/internal/util"
 )
 
-type csvPersistorData struct {
-	PacketFile   *os.File
-	PacketWriter *csv.Writer
-	QueueFile    *os.File
-	QueueWriter  *csv.Writer
-}
-
 type MeasureSessionPersistor struct {
 	session           *datatypes.DB_session
 	persist_frequency time.Duration
 	db                *persistence.Persistence
-	csv               *csvPersistorData
+	// internal, anonymous, representation of needed io objects
+	csv *struct {
+		PacketFile   *os.File
+		PacketWriter *csv.Writer
+		QueueFile    *os.File
+		QueueWriter  *csv.Writer
+	}
 }
 
-func NewMeasureSessionPersistor(
-	session *datatypes.DB_session,
-) (*MeasureSessionPersistor, error) {
+// Creates a new Persistor object, bound to the current session.
+// Will also initialize csv writers if session.parentbenchmark.csvoutput is true
+//
+// Defaults to a persitence frequency of 1 Second
+func NewMeasureSessionPersistor(session *datatypes.DB_session) (*MeasureSessionPersistor, error) {
 	mp := &MeasureSessionPersistor{
 		session:           session,
 		persist_frequency: 1 * time.Second,
@@ -40,6 +41,8 @@ func NewMeasureSessionPersistor(
 	}
 	return mp, nil
 }
+
+// internal: creats needed io objects for csv writing
 func (s *MeasureSessionPersistor) init_csv() error {
 	name := s.session.Name
 	err := os.Mkdir(name, os.ModeDir)
@@ -54,7 +57,12 @@ func (s *MeasureSessionPersistor) init_csv() error {
 			}
 		}
 	}
-	s.csv = &csvPersistorData{}
+	s.csv = &struct {
+		PacketFile   *os.File
+		PacketWriter *csv.Writer
+		QueueFile    *os.File
+		QueueWriter  *csv.Writer
+	}{}
 	s.csv.PacketFile, err = os.Create(filepath.Join(name, filepath.Base("measure_packet.csv")))
 	if err != nil {
 		return fmt.Errorf("persistMeasures: %w", err)
@@ -78,8 +86,10 @@ func (s *MeasureSessionPersistor) init_csv() error {
 	}
 	return nil
 }
-func (s *MeasureSessionPersistor) Close() {
 
+// Only has an effect if csv writing is active
+// Flushes all Wirters and Closes all opened files.
+func (s *MeasureSessionPersistor) Close() {
 	DEBUG.Println("Closing MeasureSessionPersistor")
 	if s.csv != nil {
 		s.csv.QueueWriter.Flush()
@@ -107,9 +117,14 @@ func (s *MeasureSessionPersistor) persist(sample interface{}, r util.RoutineRepo
 		if err := s.csv.PacketWriter.Write((csvsample).CsvRecord()); err != nil {
 			r.Send_error_c <- fmt.Errorf("persisting DB_measure_packet (%+v) to csv file: %w", sample, err)
 		}
+		return
 	}
+	INFO.Printf("MeasureSessionPersistor.persist(%+v): unknown behavior", sample)
 }
 
+// Stars Loop, which persits any samples comin in throug the samples channel
+//
+// Blocking, releases Wg
 func (s *MeasureSessionPersistor) Run(r util.RoutineReport, samples chan interface{}) {
 	//Setup
 	var err error
@@ -121,32 +136,21 @@ func (s *MeasureSessionPersistor) Run(r util.RoutineReport, samples chan interfa
 	for {
 		select {
 		case <-r.On_extern_exit_c:
+			DEBUG.Println("Closing persistor outer")
 			r.Wg.Done()
 			return
 		case <-tickerPersist.C: //start := time.Now()
 
 			readSamples := true
-			var samplePacketCount uint32 = 0
-			var sampleQueueCount uint32 = 0
-			var avgLoadKbits uint32 = 0
 			for readSamples {
 				select {
 				case sampleInterface := <-samples:
-					switch sample := sampleInterface.(type) {
+					switch sampleInterface.(type) {
 					// write measure to db
-					case DB_measure_packet:
+					case DB_measure_packet, DB_measure_queue:
 						s.persist(sampleInterface, r)
-						avgLoadKbits += sample.LoadKbits
-						samplePacketCount++
-					case DB_measure_queue:
-						s.persist(sampleInterface, r)
-						sampleQueueCount++
-					case exitStruct:
-						DEBUG.Println("Exiting persistMeasures: due to struct")
-						r.Wg.Done()
-						return
 					default:
-						FATAL.Printf("Unexpected Input in persistMeasures %+v", sampleInterface)
+						WARN.Printf("Unexpected Input in persistMeasures %+v", sampleInterface)
 					}
 				default:
 					readSamples = false
@@ -159,13 +163,6 @@ func (s *MeasureSessionPersistor) Run(r util.RoutineReport, samples chan interfa
 				s.csv.QueueWriter.Flush()
 			}
 
-			//durationMs := time.Now().UnixMicro() - start.UnixMicro()
-
-			if samplePacketCount > 0 {
-				//avgTimePersistPerMeasure := durationMs / int64(samplePacketCount)
-				avgLoadKbits /= samplePacketCount
-				//INFO.Printf("samples persisted: type packet %d type queue %d avg time %d us avg load %d\n", samplePacketCount, sampleQueueCount, avgTimePersistPerMeasure, avgLoadKbits)
-			}
 		}
 	}
 }
