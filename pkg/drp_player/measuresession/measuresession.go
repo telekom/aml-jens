@@ -185,6 +185,21 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, cha
 	chan_pers_sample := make(chan interface{}, 10000)
 
 	WaitGroup.Add(2)
+
+	if session.ParentBenchmark.CsvOuptut {
+		if err = os.Mkdir(session.Name, os.ModeDir); err != nil {
+			if os.IsExist(err) {
+				INFO.Printf("directory %s exists,", session.Name)
+				session.Name = session.Name + time.Now().Format("_15:04:05")
+				INFO.Printf("storing csv measures in directory %s \n", session.Name)
+				err = os.Mkdir(session.Name, os.ModeDir)
+				if err != nil {
+					FATAL.Println(err)
+				}
+			}
+		}
+	}
+
 	go aggregateMeasures(session, chan_pers_measure, chan_pers_sample, channel_close, diffTimeMs, tc)
 	go persistMeasures(session, chan_pers_sample)
 
@@ -271,6 +286,24 @@ func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, cha
 }
 
 func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasure, persist_samples chan interface{}, channel_exit chan struct{}, diffTimeMs uint64, tc *trafficcontrol.TrafficControl) {
+	//prepare csv output
+	var csvFile *os.File
+	var csvWriter *csv.Writer
+	if session.ParentBenchmark.CsvOuptut {
+		var err error
+
+		csvFile, err = os.Create(filepath.Join(session.Name, filepath.Base("measure_packet.csv")))
+		if err != nil {
+			FATAL.Exitln("failed to create csv file", err)
+		}
+		defer csvFile.Close()
+		csvWriter = csv.NewWriter(csvFile)
+		heading := assets.CONST_HEADING
+		if err := csvWriter.Write(heading); err != nil {
+			FATAL.Exitln("error writing heading to csv file", err)
+		}
+	}
+
 	sampleDuration := SAMPLE_DURATION_MS * time.Millisecond
 	ticker := time.NewTicker(sampleDuration)
 
@@ -343,6 +376,15 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 					_ = syscall.Kill(syscall.Getpid(), syscall.SIGPIPE)
 				}
 			}
+			if session.ParentBenchmark.CsvOuptut {
+				if err := csvWriter.Write(sample.CsvRecord(aggregated_measure.net_flow.MeasureIdStr())); err != nil {
+					FATAL.Exitln("error writing record to csv file", err)
+				}
+			}
+		}
+		//to csv
+		if session.ParentBenchmark.CsvOuptut {
+			csvWriter.Flush()
 		}
 		if doExit {
 			persist_samples <- exitStruct{}
@@ -364,41 +406,16 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}) {
 	//check if tag already present
 
 	//prepare csv output
-	var csvFile *os.File
-	var csvWriter *csv.Writer
 	var csvQueueFile *os.File
 	var csvQueueWriter *csv.Writer
 	if session.ParentBenchmark.CsvOuptut {
-		if err = os.Mkdir(session.Name, os.ModeDir); err != nil {
-			if os.IsExist(err) {
-				INFO.Printf("directory %s exists,", session.Name)
-				session.Name = session.Name + time.Now().Format("_15:04:05")
-				INFO.Printf("storing csv measures in directory %s \n", session.Name)
-				err = os.Mkdir(session.Name, os.ModeDir)
-				if err != nil {
-					FATAL.Println(err)
-				}
-			}
-		}
-
-		csvFile, err = os.Create(filepath.Join(session.Name, filepath.Base("measure_packet.csv")))
-		if err != nil {
-			FATAL.Exitln("failed to create csv file", err)
-		}
-		defer csvFile.Close()
-		csvWriter = csv.NewWriter(csvFile)
-		heading := assets.CONST_HEADING
-		if err := csvWriter.Write(heading); err != nil {
-			FATAL.Exitln("error writing heading to csv file", err)
-		}
-
 		csvQueueFile, err = os.Create(filepath.Join(session.Name, filepath.Base("measure_queue.csv")))
 		if err != nil {
 			FATAL.Exitln("failed to create queue csv file", err)
 		}
 		defer csvQueueFile.Close()
 		csvQueueWriter = csv.NewWriter(csvQueueFile)
-		heading = []string{"timestampMs", "memUsageBytes", "packetsinqueue"}
+		heading := []string{"timestampMs", "memUsageBytes", "packetsinqueue"}
 		if err := csvQueueWriter.Write(heading); err != nil {
 			FATAL.Exitln("error writing heading to queue csv file", err)
 		}
@@ -419,12 +436,6 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}) {
 				case DB_measure_packet:
 					if err := (*db).Persist(sample); err != nil {
 						FATAL.Exit(err)
-					}
-
-					if session.ParentBenchmark.CsvOuptut {
-						if err := csvWriter.Write(sample.CsvRecord()); err != nil {
-							FATAL.Exitln("error writing record to csv file", err)
-						}
 					}
 
 					avgLoadKbits += sample.LoadKbits
@@ -455,7 +466,6 @@ func persistMeasures(session *datatypes.DB_session, samples chan interface{}) {
 		(*db).Commit()
 		//to csv
 		if session.ParentBenchmark.CsvOuptut {
-			csvWriter.Flush()
 			csvQueueWriter.Flush()
 		}
 
