@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
@@ -34,6 +35,9 @@ func NewMeasureSessionPersistor(session *datatypes.DB_session) (*MeasureSessionP
 	mp := &MeasureSessionPersistor{
 		session:           session,
 		persist_frequency: 1 * time.Second,
+	}
+	if session.ParentBenchmark.PrintToStdOut {
+		fmt.Println(strings.Join(assets.CONST_HEADING, " "))
 	}
 	if session.ParentBenchmark.CsvOuptut {
 		DEBUG.Println("Initializing CSV")
@@ -101,6 +105,15 @@ func (s *MeasureSessionPersistor) Close() {
 func (s *MeasureSessionPersistor) persist(sample interface{}, r util.RoutineReport) {
 	if err := (*s.db).Persist(sample); err != nil {
 		r.Send_error_c <- fmt.Errorf("persisting sample (%+v) to DB: %w", sample, err)
+	}
+	if measure_packet, ok := sample.(DB_measure_packet); ok && s.session.ParentBenchmark.PrintToStdOut {
+		if err := measure_packet.PrintLine(); err != nil {
+			WARN.Println("Could not write Measurement")
+			r.Send_error_c <- err
+			//Todo check wg behaviour
+			//r.Wg.Done()
+			return
+		}
 	}
 	if s.csv == nil {
 		return

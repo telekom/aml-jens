@@ -35,6 +35,7 @@ type DB_measure_packet struct {
 	Dropped             uint32
 	Fk_flow_id          int
 	Capacitykbits       uint32
+	Net_flow_string     string
 }
 
 //go:inline
@@ -56,12 +57,12 @@ func (s *DB_measure_packet) GetSQLArgs() []any {
 }
 
 //go:inline
-func (s *DB_measure_packet) CsvRecord(netflow string) []string {
-	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped), fmt.Sprint(netflow)}
+func (s *DB_measure_packet) CsvRecord() []string {
+	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped), s.Net_flow_string}
 }
 
 //go:inline
-func (s *DB_measure_packet) PrintLine(netflow string) error {
-	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, netflow)
+func (s *DB_measure_packet) PrintLine() error {
+	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, s.Net_flow_string)
 	return err
 }
