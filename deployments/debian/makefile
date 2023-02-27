@@ -13,8 +13,8 @@ pre-build:
 	@echo [0] copy relevant package information
 	@mkdir -p ${BUILD_DIR}/etc/jens-cli
 	@cp ${ASSETS_DIR}/default_bundle/* ${BUILD_DIR}/etc/jens-cli/
-	@mkdir -p ${BUILD_DIR}/etc/bash-completion/completions
-	@cp ${ASSETS_DIR}/bash-completion/* ${BUILD_DIR}/etc/bash-completion/completions/
+	@mkdir -p ${BUILD_DIR}/usr/share/bash-completion/completions
+	@cp ${ASSETS_DIR}/bash-completion/* ${BUILD_DIR}/usr/share/bash-completion/completions/
 	@mkdir -p ${BUILD_DIR}/usr/share/man/man1
 	@cp ${ASSETS_DIR}/man/* ${BUILD_DIR}/usr/share/man/man1/
 	@mkdir -p ${BUILD_DIR}/doc/jens-cli
