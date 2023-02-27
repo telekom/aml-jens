@@ -27,6 +27,7 @@ import (
 
 // Implements MassPersistable interface
 type DB_measure_packet struct {
+	//Only for inprogram use! (=netFlowID)
 	Time                uint64
 	PacketSojournTimeMs uint32
 	LoadKbits           uint32
@@ -55,8 +56,8 @@ func (s *DB_measure_packet) GetSQLArgs() []any {
 }
 
 //go:inline
-func (s *DB_measure_packet) CsvRecord() []string {
-	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped)}
+func (s *DB_measure_packet) CsvRecord(netflow string) []string {
+	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped), fmt.Sprint(netflow)}
 }
 
 //go:inline
