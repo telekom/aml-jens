@@ -35,16 +35,12 @@ package measuresession
 */
 import "C"
 import (
-	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/persistence"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
@@ -84,6 +80,7 @@ func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 		Dropped:             s.sumDropped,
 		Fk_flow_id:          s.net_flow.Flow_id,
 		Capacitykbits:       sampleCapacityKbits,
+		Net_flow_string:     s.net_flow.MeasureIdStr(),
 	}
 }
 
@@ -250,10 +247,6 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 	//Use of sync.Map instead of map:
 	//Used as a cache
 	mapMeasures := sync.Map{}
-	// stdout heading
-	if session.ParentBenchmark.PrintToStdOut {
-		fmt.Println(strings.Join(assets.CONST_HEADING, " "))
-	}
 	r.Wg.Add(1)
 	go func() {
 		p, err := persistence.GetPersistence()
@@ -270,7 +263,7 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 				return
 			case single_packet_measure := <-messages:
 				if err := (*p).Persist(single_packet_measure.net_flow); err != nil {
-					FATAL.Exit(err)
+					r.Send_error_c <- err
 				}
 				measure, _ := mapMeasures.LoadOrStore(single_packet_measure.net_flow.MeasureIdStr(), NewAggregateMeasure(single_packet_measure.net_flow))
 				m, ok := measure.(*AggregateMeasure)
@@ -314,138 +307,13 @@ func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasur
 					return true
 				}
 				persist_samples <- sample
-				if session.ParentBenchmark.PrintToStdOut {
-					if err := sample.PrintLine(aggregated_measure.net_flow.MeasureIdStr()); err != nil {
-						WARN.Println("Could not write Measurement")
-						r.Send_error_c <- err
-						r.Wg.Done()
-						return false
-					}
-				}
 				return true
 			})
 			mapMeasures.Range(func(key, value any) bool {
 				mapMeasures.Delete(key)
 				return true
 			})
-		}
-	}
-}
 
-func persistMeasures(session *datatypes.DB_session, samples chan interface{}, r util.RoutineReport) {
-	tickerPersist := time.NewTicker(1 * time.Second)
-
-	var db, err = persistence.GetPersistence()
-	if err != nil {
-		r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
-	}
-	//var db sql.DB
-	// create session tag
-	//check if tag already present
-
-	//prepare csv output
-	var csvFile *os.File
-	var csvWriter *csv.Writer
-	var csvQueueFile *os.File
-	var csvQueueWriter *csv.Writer
-	if session.ParentBenchmark.CsvOuptut {
-		if err = os.Mkdir(session.Name, os.ModeDir); err != nil {
-			if os.IsExist(err) {
-				INFO.Printf("directory %s exists,", session.Name)
-				session.Name = session.Name + time.Now().Format("_15:04:05")
-				INFO.Printf("storing csv measures in directory %s \n", session.Name)
-				err = os.Mkdir(session.Name, os.ModeDir)
-				if err != nil {
-					r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
-				}
-			}
-		}
-
-		csvFile, err = os.Create(filepath.Join(session.Name, filepath.Base("measure_packet.csv")))
-		if err != nil {
-			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
-		}
-		defer csvFile.Close()
-		csvWriter = csv.NewWriter(csvFile)
-		heading := assets.CONST_HEADING
-		if err := csvWriter.Write(heading); err != nil {
-			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
-		}
-
-		csvQueueFile, err = os.Create(filepath.Join(session.Name, filepath.Base("measure_queue.csv")))
-		if err != nil {
-			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
-		}
-		defer csvQueueFile.Close()
-		csvQueueWriter = csv.NewWriter(csvQueueFile)
-		heading = []string{"timestampMs", "memUsageBytes", "packetsinqueue"}
-		if err := csvQueueWriter.Write(heading); err != nil {
-			r.Send_error_c <- fmt.Errorf("persistMeasures: %w", err)
-		}
-	}
-	for {
-		select {
-		case <-r.On_extern_exit_c:
-			r.Wg.Done()
-			return
-		case <-tickerPersist.C: //start := time.Now()
-
-			readSamples := true
-			var samplePacketCount uint32 = 0
-			var sampleQueueCount uint32 = 0
-			var avgLoadKbits uint32 = 0
-			for readSamples {
-				select {
-				case sampleInterface := <-samples:
-					switch sample := sampleInterface.(type) {
-					// write measure to db
-					case DB_measure_packet:
-						if err := (*db).Persist(sample); err != nil {
-							r.Send_error_c <- fmt.Errorf("could not persist MP: %w", err)
-							//FATAL.Exit(err)
-						}
-
-						if session.ParentBenchmark.CsvOuptut {
-							if err := csvWriter.Write(sample.CsvRecord()); err != nil {
-								r.Send_error_c <- fmt.Errorf("could write MP to csv: %w", err)
-							}
-						}
-
-						avgLoadKbits += sample.LoadKbits
-						samplePacketCount++
-					case DB_measure_queue:
-						if err := (*db).Persist(&sample); err != nil {
-							r.Send_error_c <- fmt.Errorf("could not persist MQ: %w", err)
-						}
-
-						if session.ParentBenchmark.CsvOuptut {
-							if err := csvQueueWriter.Write(sample.CsvRecord()); err != nil {
-								r.Send_error_c <- fmt.Errorf("could write MQ to csv: %w", err)
-							}
-						}
-
-						sampleQueueCount++
-					default:
-						FATAL.Printf("Unexpected Input in persistMeasures: %+v", sampleInterface)
-					}
-				default:
-					readSamples = false
-				}
-			}
-			(*db).Commit()
-			//to csv
-			if session.ParentBenchmark.CsvOuptut {
-				csvWriter.Flush()
-				csvQueueWriter.Flush()
-			}
-
-			//durationMs := time.Now().UnixMicro() - start.UnixMicro()
-
-			if samplePacketCount > 0 {
-				//avgTimePersistPerMeasure := durationMs / int64(samplePacketCount)
-				avgLoadKbits /= samplePacketCount
-				//INFO.Printf("samples persisted: type packet %d type queue %d avg time %d us avg load %d\n", samplePacketCount, sampleQueueCount, avgTimePersistPerMeasure, avgLoadKbits)
-			}
 		}
 	}
 }
