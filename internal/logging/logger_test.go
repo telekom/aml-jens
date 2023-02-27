@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/telekom/aml-jens/internal/assets/paths"
 )
 
@@ -82,9 +83,11 @@ func postTest(t *testing.T, path string) {
 	}
 }
 func TestGetLoggerFileCreation(t *testing.T) {
-	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
+	log_path := "/tmp/TESTING.log"
+	viper.AddConfigPath("/tmp")
 	_, _, _, _ = GetLogger()
-	InitLogger("TESTING")
+
+	initLogger("TESTING", "/tmp/")
 	defer postTest(t, log_path)
 
 	log_file_exists, err := doesFileExists(log_path)
@@ -97,10 +100,10 @@ func TestGetLoggerFileCreation(t *testing.T) {
 }
 
 func TestInitLoggerDEBUG(t *testing.T) {
-	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
+	log_path := filepath.Join("/tmp/", "TESTING.log")
 	os.Setenv("JENS_DEBUG", "1")
 	_, _, _, _ = GetLogger()
-	InitLogger("TESTING")
+	initLogger("TESTING", "/tmp/")
 	defer postTest(t, log_path)
 	DEBUG, _, _, _ := GetLogger()
 	w := DEBUG.Writer()
@@ -112,7 +115,7 @@ func TestInitLoggerDEBUG_0(t *testing.T) {
 	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
 	os.Setenv("JENS_DEBUG", "0")
 	_, _, _, _ = GetLogger()
-	InitLogger("TESTING")
+	initLogger("TESTING", "/tmp/")
 	defer postTest(t, log_path)
 	DEBUG, _, _, _ := GetLogger()
 	w := DEBUG.Writer()
@@ -124,7 +127,7 @@ func TestInitLoggerDEBUG_not(t *testing.T) {
 	os.Unsetenv("JENS_DEBUG")
 	log_path := filepath.Join(paths.LOG_PATH(), "TESTING.log")
 	_, _, _, _ = GetLogger()
-	InitLogger("TESTING")
+	initLogger("TESTING", "/tmp/")
 	defer postTest(t, log_path)
 	DEBUG, _, _, _ := GetLogger()
 	w := DEBUG.Writer()
