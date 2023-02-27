@@ -59,12 +59,27 @@ var (
 	fp                     *os.File     = nil
 )
 
+// Add a Exit Function to the FATAL logger only.
+func LinkExitFunction(exit func() uint8, timeoutMs int) {
+	if singelton_fatal_logger != nil {
+		singelton_fatal_logger.setExitFunc(exit, timeoutMs)
+	} else {
+		rlog.Default().Fatal("Cant set Exit funtion on not set Logger")
+	}
+}
+
 // Initialize all Loggers.
 // Ueses name as the program_name --> filepath
 // if JENS_DEBUG is set in env, DebugPrints are enabled
 func InitLogger(name string) {
+	initLogger(name, paths.LOG_PATH())
+}
+
+// internal
+// Init Logger while also specifiytig the path
+func initLogger(name string, path string) {
 	var err error
-	err = os.MkdirAll(paths.LOG_PATH(), 0666)
+	err = os.MkdirAll(path, 0666)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "COULD NOT INIT LOGGER")
 		fmt.Fprint(os.Stderr, err)
@@ -75,7 +90,7 @@ func InitLogger(name string) {
 	}
 	file := program_name + ".log"
 
-	path := filepath.Join(paths.LOG_PATH(), file)
+	path = filepath.Join(path, file)
 	fp, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error while creating Logger")
@@ -88,15 +103,6 @@ func InitLogger(name string) {
 	debug_mode, err := strconv.ParseBool(os.Getenv("JENS_DEBUG"))
 	if err == nil && debug_mode {
 		singelton_debug_logger.SetOutput(fp)
-	}
-}
-
-// Add a Exit Function to the FATAL logger only.
-func LinkExitFunction(exit func() uint8, timeoutMs int) {
-	if singelton_fatal_logger != nil {
-		singelton_fatal_logger.setExitFunc(exit, timeoutMs)
-	} else {
-		rlog.Default().Fatal("Cant set Exit funtion on not set Logger")
 	}
 }
 
