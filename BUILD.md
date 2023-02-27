@@ -14,3 +14,5 @@ Using `VERSION=00.01-01 make build-binaries`
 Using `make package`.
 
 The Version can be specified by setting VERSION: `VERSION=00.01-01 make package`. It defaults to "-dev-00.00-99". 
+
+The package is generated into folder `out`.
