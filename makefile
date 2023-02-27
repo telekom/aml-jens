@@ -13,6 +13,10 @@ clean-binaries:
 	@rm -rf ./bin/*
 clean-packages:
 	@rm -rf ./out/*
+clean: # Cleans binaries and deployments
+clean: clean-binaries clean-packages
+	@echo "Done cleaning"
+
 test: # Run go tests
 test: 
 	@go test ./...
