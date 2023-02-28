@@ -37,14 +37,14 @@ go-test: go-pre-test
 
 go-pre-test:
 	@cp -rf testdata drbenchmark
-	@cp -rf testdata cmd/drplay
+	@cp -rf testdata cmd/drplay/
 	@cp -rf testdata drcommon/persistence/jsonp
 	@cp -rf testdata drcommon/persistence/datatypes
 
 clean-go-testdata:
 	@echo Removing Testdata
 	@rm -rf drbenchmark/testdata
-	@rm -rf testdata cmd/drplay
+	@rm -rf testdata cmd/drplay/testdata
 	@rm -rf drcommon/persistence/jsonp/testdata
 	@rm -rf drcommon/persistence/datatypes/testdata
 
