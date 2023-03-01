@@ -41,7 +41,7 @@ func (s *Database) ClearCache() {
 }
 
 func (s *Database) print(txt string, args ...any) {
-	DEBUG.Printf(txt, args...)
+	//DEBUG.Printf(txt, args...)
 }
 func (s *Database) Close() error {
 	s.print("Closing Persistence")
