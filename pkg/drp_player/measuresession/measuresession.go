@@ -35,6 +35,7 @@ package measuresession
 */
 import "C"
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -110,210 +111,249 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
 	s.sampleCount++
 }
 
+type DbPacketMeasure struct {
+	timestampMs   uint64
+	sojournTimeMs uint32
+	loadKbits     uint32
+	capacityKbits uint32
+	ecnCePercent  uint32
+	dropped       uint32
+	netFlow       string
+}
+
+type DbQueueMeasure struct {
+	timestampMs            uint64
+	numberOfPacketsInQueue uint16
+	memUsageBytes          uint32
+}
+
 const MM_FILE = "/sys/kernel/debug/sch_janz/0001:0"
 
 const SAMPLE_DURATION_MS = 10
 
 var bool2int = map[bool]int8{false: 0, true: 1}
 
-// Start the measuresession
-//
-// # Uses util.RoutineReport
-//
-// Blocking - spawns 3 (three)  more goroutines, adds them to wg
-func Start(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, r util.RoutineReport) {
-	// open memory file stream
-	recordArray := make(RecordArray, RECORD_SIZE)
-	INFO.Println("start measure session")
-	var file, err = os.Open(MM_FILE)
-	if err != nil {
-		FATAL.Println("Could not open MM_FILE")
-		r.Send_error_c <- err
-		r.Wg.Done()
-		return
-	}
-	defer file.Close()
+type MeasureSession struct {
+	session             *datatypes.DB_session
+	tc                  *trafficcontrol.TrafficControl
+	chan_to_aggregation chan PacketMeasure
+	chan_to_persistence chan interface{}
+	time_diff           uint64
+	wg                  *sync.WaitGroup
+	should_end          bool
+	persistor           *MeasureSessionPersistor
+}
 
-	recordCount := 0
-
-	// compute offset of monotonic and system clock
+func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl) MeasureSession {
 	monotonicMs := uint64(C.get_nsecs()) / 1e6
 	systemMs := uint64(time.Now().UnixMilli())
-	diffTimeMs := systemMs - monotonicMs
+	var wg sync.WaitGroup
+	p, err := NewMeasureSessionPersistor(session)
+	if err != nil {
+		WARN.Printf("Could not create persisitor: %v", err)
+	}
+	return MeasureSession{
+		session:             session,
+		tc:                  tc,
+		chan_to_aggregation: make(chan PacketMeasure, 10000),
+		chan_to_persistence: make(chan interface{}, 10000),
+		time_diff:           systemMs - monotonicMs,
+		wg:                  &wg,
+		should_end:          false,
+		persistor:           p,
+	}
+
+}
+func (m MeasureSession) Start(r util.RoutineReport) {
+	// open memory file stream
+	INFO.Println("start measure session")
+
+	// compute offset of monotonic and system clock
 
 	// start aggregate and persist threads with communication channels
-	chan_pers_measure := make(chan PacketMeasure, 10000)
-	chan_pers_sample := make(chan interface{}, 10000)
-	chan_poll_result := make(chan int)
-	persistor, err := NewMeasureSessionPersistor(session)
-	if err != nil {
-		FATAL.Println("Could not create Persistor")
-		r.Send_error_c <- err
-		r.Wg.Done()
-		return
-	}
-	r.Wg.Add(1)
-	go persistor.Run(r, chan_pers_sample)
-	r.Wg.Add(1)
-	go aggregateMeasures(session, chan_pers_measure, chan_pers_sample, diffTimeMs, tc, r)
 
-	var fdint C.int = C.int(uint(file.Fd()))
-	pfd := C.struct_pollfd{fdint, C.POLLIN, 0}
-	//Helper function
-	done := func() {
-		persistor.Close()
-		r.Wg.Done()
-	}
-	r.Wg.Add(1)
 	go func() {
-		for {
-			select {
-			case <-r.On_extern_exit_c:
-				DEBUG.Println("Closing measuresession")
-				r.Wg.Done()
-				return
-			case <-time.After(10 * time.Millisecond):
-				rc := C.poll(&pfd, 1, 9)
-				if rc > 0 {
-					bytesRead, err := file.Read(recordArray)
-					if err == io.EOF {
-						INFO.Println("EOF")
-					}
-					select {
-					case chan_poll_result <- bytesRead:
-						//Good
-					default:
-						// chan_poll_result does not get polled
-						DEBUG.Println("Throwing away poll event")
-					}
-
-				}
-			}
-		}
+		<-r.On_extern_exit_c
+		DEBUG.Println("ShouldExit=True")
+		m.should_end = true
 	}()
 
-	for {
-		select {
+	m.wg.Add(1)
+	go m.persistor.Run(m.chan_to_persistence, func(err error, level util.ErrorLevel) {
+		r.Send_error_c <- struct {
+			Err   error
+			Level util.ErrorLevel
+		}{
+			Err:   err,
+			Level: level,
+		}
+	}, func() {
 
-		case <-r.On_extern_exit_c:
-			DEBUG.Println("Closing measuresession - recordarray parser")
-			done()
-			return
-		case bytesRead := <-chan_poll_result:
-			// read one record of either packet or queue type
-			if bytesRead != RECORD_SIZE {
-				continue
-			}
-			switch recordArray.type_id() {
-			case RECORD_TYPE_Q:
-				queueMeasure, err := recordArray.AsDB_measure_queue(diffTimeMs, session.Session_id)
-				if err != nil {
-					WARN.Println("Could not format record as MQ")
-					r.Send_error_c <- err
-					done()
-					return
-				}
-				chan_pers_sample <- *queueMeasure
-			case RECORD_TYPE_P:
-				packetMeasure, err := recordArray.AsPacketMeasure(session.Session_id)
-				if err != nil {
-					WARN.Println("Could not format record as MP")
-					r.Send_error_c <- err
-					done()
-					return
-				}
-				if packetMeasure == nil {
-					INFO.Printf("non ip packet ignored\n")
-				} else {
-					chan_pers_measure <- *packetMeasure
-				}
-			default:
-				WARN.Printf("Cant Parse recordarray %v: unknown type", recordArray)
-			}
+		DEBUG.Println("Closing persistor")
+		m.wg.Done()
+	})
+	m.wg.Add(1)
+	go m.poll(r)
 
-			recordCount++
+	m.wg.Add(1)
+	go m.aggregateMeasures(r)
+
+	m.wg.Wait()
+	DEBUG.Println("Closed measure_session")
+	r.Wg.Done()
+}
+
+// Represents the polling loop.
+// Will close if membervariable m.shouldEnd becomes true
+// Will foreward this signal by closing chan_to_aggregation
+func (m *MeasureSession) poll(r util.RoutineReport) {
+	//Buffer in which the contets of MM_FILE will be written
+	recordArray := make(RecordArray, RECORD_SIZE)
+	var file, err = os.Open(MM_FILE)
+	if err != nil {
+		r.ReportFatal(fmt.Errorf("measuresession.poll: %w", err))
+	}
+	defer func() {
+		DEBUG.Println("Closing poll")
+		if file != nil {
+			file.Close()
+		}
+		m.wg.Done()
+		//Forward closing to aggregation
+		close(m.chan_to_aggregation)
+	}()
+	var fdint C.int = C.int(uint(file.Fd()))
+	pfd := C.struct_pollfd{fdint, C.POLLIN, 0}
+	for !m.should_end {
+		// poll fd
+		rc := C.poll(&pfd, 1, 1000)
+		if rc <= 0 {
+			//INFO.Println("rc <= 0")
+			continue
+		}
+		// read one record of either packet or queue type
+		bytesRead, err := file.Read(recordArray)
+		if err == io.EOF {
+			r.ReportInfo(fmt.Errorf("EOF while reading recordArray"))
+		}
+
+		if bytesRead != 64 {
+			r.ReportInfo(fmt.Errorf("bytesRead != 64 while reading recordArray"))
+			continue
+		}
+		timestampMs := uint64(binary.LittleEndian.Uint64(recordArray[0:8])) / 1e6
+		switch recordArray.type_id() {
+		case RECORD_TYPE_P: // PacketMeasure MP
+			packetMeasure, err := recordArray.AsPacketMeasure(m.session.Session_id)
+			if err != nil {
+				r.ReportWarn(fmt.Errorf("could not parse packetMeasure: %w", err))
+			}
+			if packetMeasure != nil {
+				m.chan_to_aggregation <- *packetMeasure
+
+			} else {
+				DEBUG.Printf("non ip packet ignored\n")
+			}
+		case RECORD_TYPE_Q: // QueueMeasure MQ
+			numberOfPacketsInQueue := uint16(binary.LittleEndian.Uint16(recordArray[10:12]))
+			memUsageBytes := uint32(binary.LittleEndian.Uint32(recordArray[12:16]))
+			currentEpochMs := timestampMs + m.time_diff
+			queueMeasure := DB_measure_queue{
+				Time:              currentEpochMs,
+				Memoryusagebytes:  memUsageBytes,
+				PacketsInQueue:    numberOfPacketsInQueue,
+				Fk_session_tag_id: m.session.Session_id,
+			}
+			if !m.should_end {
+				m.chan_to_persistence <- queueMeasure
+			} else {
+				return
+			}
+		default: //Error
+			r.ReportWarn(fmt.Errorf("could not parse record_array (type): %+v", recordArray))
 		}
 	}
 }
-
-// Start the measuresession
-//
-// # Uses util.RoutineReport
-//
-// Blocking - spawns 1 (one)  more goroutine, adds them to wg
-func aggregateMeasures(session *datatypes.DB_session, messages chan PacketMeasure, persist_samples chan interface{}, diffTimeMs uint64, tc *trafficcontrol.TrafficControl, r util.RoutineReport) {
+func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 	sampleDuration := SAMPLE_DURATION_MS * time.Millisecond
 	ticker := time.NewTicker(sampleDuration)
-	//Use of sync.Map instead of map:
-	//Used as a cache
-	mapMeasures := sync.Map{}
-	r.Wg.Add(1)
-	go func() {
-		p, err := persistence.GetPersistence()
-		if err != nil {
-			r.Send_error_c <- fmt.Errorf("aggregateMeasure: %w", err)
-			r.Wg.Done()
-			return
+	defer func() {
+		DEBUG.Println("Closed AggregateMeasures")
+		close(m.chan_to_persistence)
+		m.wg.Done()
+	}()
+	doExit := false
+	p, err := persistence.GetPersistence()
+	if err != nil {
+		r.ReportFatal(fmt.Errorf("aggregateMeasure: %w", err))
+		return
+	}
+	for range ticker.C {
+		mapMeasures := make(map[string]*AggregateMeasure)
+		readMessages := true
+		var packetStartTimeMs uint64 = 0
+		message, is_open := <-m.chan_to_aggregation
+		if !is_open {
+			readMessages = false
+			doExit = false
+		} else {
+			packetStartTimeMs = message.timestampMs
 		}
-		for {
+
+		for readMessages {
 			select {
-			case <-r.On_extern_exit_c:
-				DEBUG.Println("Closing aggregateMeasures - writer")
-				r.Wg.Done()
-				return
-			case single_packet_measure := <-messages:
-				if err := (*p).Persist(single_packet_measure.net_flow); err != nil {
-					r.Send_error_c <- err
+			case message, is_open = <-m.chan_to_aggregation: // Aggregate Measure
+				if !is_open {
+					readMessages = false
+					doExit = true
+					break
 				}
-				measure, _ := mapMeasures.LoadOrStore(single_packet_measure.net_flow.MeasureIdStr(), NewAggregateMeasure(single_packet_measure.net_flow))
-				m, ok := measure.(*AggregateMeasure)
-				if !ok {
-					//This should NEVER happen
-					r.Send_error_c <- fmt.Errorf("stored %+v in mapMeasures", measure)
-					r.Wg.Done()
+				diffMs := int64(message.timestampMs - packetStartTimeMs)
+				if diffMs > sampleDuration.Milliseconds() {
+					readMessages = false
+				}
+				if err := (*p).Persist(message.net_flow); err != nil {
+					r.ReportFatal(fmt.Errorf("aggregateMeasure: %w", err))
 					return
 				}
-				m.add(&single_packet_measure, tc.CurrentRate())
+				measure, keyExists := mapMeasures[message.net_flow.MeasureIdStr()]
+				if !keyExists {
+					measure = NewAggregateMeasure(message.net_flow)
+					mapMeasures[message.net_flow.MeasureIdStr()] = measure
+				}
+
+				measure.add(&message, m.tc.CurrentRate())
+
+			default:
+				readMessages = false
 			}
 		}
-	}()
-	for {
-		select {
-		case <-r.On_extern_exit_c:
-			DEBUG.Println("Closing aggregateMeasures - reader")
-			r.Wg.Done()
+		if doExit {
 			return
-		case <-ticker.C:
-			mapMeasures.Range(func(key any, value any) bool {
-				aggregated_measure, ok := value.(*AggregateMeasure)
-				if !ok {
-					WARN.Println("Can NOT iterate Measures, got invalid value.")
-					return false
-				}
-				if aggregated_measure.sampleCount == 0 {
-					return true
-				}
-				currentEpochMs := time.Now().UnixNano()/(int64(time.Millisecond)/int64(time.Nanosecond)) - 5
-
-				sample := aggregated_measure.toDB_measure_packet(uint64(currentEpochMs))
+		}
+		for _, aggregated_measure := range mapMeasures {
+			if aggregated_measure.sampleCount == 0 {
+				continue
+			}
+			// send to persist measure sample
+			currentEpochMs := message.timestampMs + m.time_diff
+			sample := aggregated_measure.toDB_measure_packet(currentEpochMs)
+			if m.session.ParentBenchmark.CsvOuptut {
 				if sample.Capacitykbits == 0 {
 					//this sometimes happens
 					//Everything in the sample is zero but the time
 					if sample.Dropped != 0 || sample.LoadKbits != 0 || sample.Ecn != 0 {
-						DEBUG.Printf("Capacity is 0 but not everything: %+v", sample)
-						return true
+						INFO.Printf("Capacity is 0 but not everything: %+v", sample)
+						continue
 					}
-					INFO.Printf("Not Persisting: %+v", sample)
-					return true
+					DEBUG.Printf("Not Persisting: %+v", sample)
+					continue
 				}
-				persist_samples <- sample
-				return true
-			})
-			mapMeasures.Range(func(key, value any) bool {
-				mapMeasures.Delete(key)
-				return true
-			})
-
+			}
+			m.chan_to_persistence <- sample
+			//if m.session.ParentBenchmark.PrintToStdOut {
+			//	  sample.PrintLine()
+			//}
 		}
 	}
 }

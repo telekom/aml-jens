@@ -17,23 +17,29 @@ import (
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DrpPlayer struct {
-	session *datatypes.DB_session
-	errs    []error
-	tc      *trafficcontrol.TrafficControl
-	r       util.RoutineReport
+	session             *datatypes.DB_session
+	tc                  *trafficcontrol.TrafficControl
+	r                   util.RoutineReport
+	is_shutting_down    bool
+	close_channel_mutex *sync.Mutex
 }
 
 func NewDrpPlayer(session *datatypes.DB_session) *DrpPlayer {
 	var wg sync.WaitGroup
+	var close_channel_mutex sync.Mutex
 	d := &DrpPlayer{
-		session: session,
-		errs:    make([]error, 0, 5),
+		is_shutting_down: false,
+		session:          session,
 		r: util.RoutineReport{
-			Wg:                       &wg,
-			On_extern_exit_c:         make(chan uint8),
-			Send_error_c:             make(chan error),
+			Wg:               &wg,
+			On_extern_exit_c: make(chan uint8),
+			Send_error_c: make(chan struct {
+				Err   error
+				Level util.ErrorLevel
+			}),
 			Application_has_finished: make(chan string),
 		},
+		close_channel_mutex: &close_channel_mutex,
 	}
 	return d
 }
@@ -62,9 +68,21 @@ func (s *DrpPlayer) Start() error {
 			//Send exit signal to all
 			INFO.Println("DrPlay was asked to quit")
 		case err := <-s.r.Send_error_c:
-			WARN.Printf("Something went wrong during DrPlay: %v", err)
+			switch err.Level {
+			case util.ErrInfo:
+				INFO.Printf("During DrPlay: %v", err.Err)
+			case util.ErrWarn:
+				WARN.Printf("During DrPlay: %v", err.Err)
+			case util.ErrFatal:
+				FATAL.Printf("Something went wrong during DrPlay: %v", err.Err)
+				s.close_channel()
+				if s.is_shutting_down {
+					FATAL.Printf("^^ Above exception happend while DrPlay was already shutting down")
+				}
+			default:
+				WARN.Printf("Unknown ErrLevel during Drplay: %+v", err)
+			}
 			//Something went wrong exit signal to all
-			s.errs = append(s.errs, err)
 			return
 		}
 	}()
@@ -81,13 +99,15 @@ func (s *DrpPlayer) Start() error {
 		s.r,
 	)
 	if !s.session.ChildDRP.Nomeasure {
+		ms := measuresession.NewMeasureSession(s.session, s.tc)
 		s.r.Wg.Add(1)
-		go measuresession.Start(s.session, s.tc, s.r)
+		go ms.Start(s.r)
 	}
 
 	return nil
 }
 func (s *DrpPlayer) exit_clean() {
+	DEBUG.Println("exit_clean")
 	if err := s.tc.Close(); err != nil {
 		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
 	}
@@ -101,11 +121,25 @@ func (s *DrpPlayer) exit_clean() {
 }
 func (s *DrpPlayer) Wait() {
 	s.r.Wg.Wait()
-	DEBUG.Println("exit_clean")
 	s.exit_clean()
 }
-func (s *DrpPlayer) Exit() {
+func (s *DrpPlayer) close_channel() {
+	s.close_channel_mutex.Lock()
+	if s.is_shutting_down {
+		s.close_channel_mutex.Unlock()
+		DEBUG.Println("Drplay is already closing itself")
+		return
+	}
+	DEBUG.Println("Closing channel")
 	close(s.r.On_extern_exit_c)
+	s.is_shutting_down = true
+	s.close_channel_mutex.Unlock()
+
+}
+
+func (s *DrpPlayer) Exit() {
+	DEBUG.Println("DrpPlayer was asked to Exit()")
+	s.close_channel()
 	DEBUG.Println("Waiting for routines to end")
 	s.Wait()
 	DEBUG.Println("Player has exited")
