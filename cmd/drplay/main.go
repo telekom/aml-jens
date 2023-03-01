@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -141,6 +142,7 @@ func exithandler(player *drplay.DrpPlayer, exit chan uint8) {
 
 func main() {
 	logging.InitLogger(assets.NAME_DRPLAY)
+	INFO.Printf("===>Starting DrPlay @%s <===\n\n", time.Now().String())
 	var player_has_ended = make(chan uint8)
 	if err := ArgParse(); err != nil {
 		FATAL.Println("Error during Argparse")
@@ -149,21 +151,34 @@ func main() {
 	session := config.PlayCfg().A_Session
 	db, err := persistence.GetPersistence()
 	if err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		os.Exit(4)
 	}
 	err = (*db).Persist(session)
 	if err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		os.Exit(1)
 	}
 	player := drplay.NewDrpPlayer(session)
+
+	//Todo should be done in caller, not callee
+	logging.LinkExitFunction(func() uint8 {
+		FATAL.Println("Logger experienced a fatal error")
+		player.Exit()
+		panic("A")
+		//return 255
+	}, 5000)
 	exithandler(player, player_has_ended)
 	err = player.Start()
 	if err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		os.Exit(-1)
 	}
 	player.Wait()
 	close(player_has_ended)
 	if err := (*db).Close(); err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		os.Exit(2)
 	}
+	fmt.Println(strings.Join(assets.END_OF_DRPLAY[:], " "))
 }
