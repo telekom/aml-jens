@@ -206,14 +206,14 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatype
 					r.Wg.Done()
 					return
 				} else {
-					r.Send_error_c <- fmt.Errorf("LaunchChangeLoop could retrieve next Value: %w", err)
+					r.ReportWarn(fmt.Errorf("LaunchChangeLoop could retrieve next Value: %w", err))
 					r.Wg.Done()
 					return
 				}
 			}
 			//change data rate in control file
 			if err := tc.ChangeTo(value); err != nil {
-				r.Send_error_c <- fmt.Errorf("LaunchChangeLoop could not change Value: %w", err)
+				r.ReportFatal(fmt.Errorf("LaunchChangeLoop could not change Value: %w", err))
 				r.Wg.Done()
 				return
 			}
