@@ -143,8 +143,8 @@ func (s *DataBase) Persist(obj interface{}) error {
 	switch v := obj.(type) {
 	case datatypes.DB_measure_packet:
 		return s.persist_measure_packet(v)
-	case datatypes.DB_measure_queue:
-		return s.persist_measurequeue(v)
+	case *datatypes.DB_measure_queue:
+		return s.persist_measurequeue(*v)
 	case *datatypes.DB_network_flow:
 		if err := s.persist_flow(v); err != nil {
 			return fmt.Errorf("Persist(datatypes.DB_network_flow)%v", err)
