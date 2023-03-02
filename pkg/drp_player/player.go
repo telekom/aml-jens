@@ -92,18 +92,18 @@ func (s *DrpPlayer) Start() error {
 	if err := s.initTC(); err != nil {
 		return fmt.Errorf("initTC returned %w", err)
 	}
+
+	if !s.session.ChildDRP.Nomeasure {
+		ms := measuresession.NewMeasureSession(s.session, s.tc)
+		s.r.Wg.Add(1)
+		go ms.Start(s.r)
+	}
 	s.r.Wg.Add(1)
 	go s.tc.LaunchChangeLoop(
 		time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
 		s.session.ChildDRP,
 		s.r,
 	)
-	if !s.session.ChildDRP.Nomeasure {
-		ms := measuresession.NewMeasureSession(s.session, s.tc)
-		s.r.Wg.Add(1)
-		go ms.Start(s.r)
-	}
-
 	return nil
 }
 func (s *DrpPlayer) exit_clean() {
@@ -148,8 +148,12 @@ func (s *DrpPlayer) initTC() error {
 	s.tc = trafficcontrol.NewTrafficControl(s.session.Dev)
 	//Resetting qdisc
 	//might fail - ignore
-	_ = s.tc.Reset()
-	time.Sleep(time.Duration(s.session.ChildDRP.WarmupTimeMs) * time.Millisecond)
+	select {
+	case <-s.r.On_extern_exit_c:
+		return nil
+	case <-time.After(time.Duration(s.session.ChildDRP.WarmupTimeMs) * time.Millisecond):
+		_ = s.tc.Reset()
+	}
 	err := s.tc.Init(trafficcontrol.TrafficControlStartParams{
 		Datarate:     uint32(s.session.ChildDRP.Peek()),
 		QueueSize:    int(s.session.Queuesizepackets),
@@ -161,9 +165,5 @@ func (s *DrpPlayer) initTC() error {
 			L4sPremarking: s.session.L4sEnablePreMarking,
 			SignalStart:   s.session.SignalDrpStart,
 		})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

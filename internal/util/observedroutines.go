@@ -1,6 +1,9 @@
 package util
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type ErrorLevel uint8
 
@@ -24,12 +27,16 @@ type RoutineReport struct {
 }
 
 func (r RoutineReport) Report(err error, level ErrorLevel) {
-	r.Send_error_c <- struct {
+	select {
+	case r.Send_error_c <- struct {
 		Err   error
 		Level ErrorLevel
 	}{
 		Err:   err,
 		Level: level,
+	}:
+	case <-time.After(100 * time.Millisecond):
+		WARN.Printf("Could not report Error[%d]: %s", level, err)
 	}
 }
 func (r RoutineReport) ReportFatal(err error) {

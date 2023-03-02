@@ -176,6 +176,7 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 		<-r.On_extern_exit_c
 		DEBUG.Println("ShouldExit=True")
 		m.should_end = true
+		m.persistor.Exit()
 	}()
 
 	m.wg.Add(1)
@@ -214,7 +215,7 @@ func (m *MeasureSession) poll(r util.RoutineReport) {
 		r.ReportFatal(fmt.Errorf("measuresession.poll: %w", err))
 	}
 	defer func() {
-		DEBUG.Println("Closing poll")
+		DEBUG.Println("Closed: Poll")
 		if file != nil {
 			file.Close()
 		}
@@ -294,8 +295,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 		var packetStartTimeMs uint64 = 0
 		message, is_open := <-m.chan_to_aggregation
 		if !is_open {
-			readMessages = false
-			doExit = false
+			return
 		} else {
 			packetStartTimeMs = message.timestampMs
 		}
@@ -303,6 +303,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 		for readMessages {
 			select {
 			case message, is_open = <-m.chan_to_aggregation: // Aggregate Measure
+
 				if !is_open {
 					readMessages = false
 					doExit = true
@@ -329,6 +330,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 			}
 		}
 		if doExit {
+			DEBUG.Println("Retruning from aggregation")
 			return
 		}
 		for _, aggregated_measure := range mapMeasures {
@@ -350,7 +352,11 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 					continue
 				}
 			}
-			m.chan_to_persistence <- sample
+			select {
+			case m.chan_to_persistence <- sample:
+			default:
+			}
+
 			//if m.session.ParentBenchmark.PrintToStdOut {
 			//	  sample.PrintLine()
 			//}
