@@ -22,35 +22,38 @@
 package trafficcontrol
 
 import (
-	"bytes"
-	"os/exec"
-
 	"github.com/telekom/aml-jens/internal/commands"
 )
 
-func CreateNftRuleECT(dev string, nftTable string, chainForward string, chainOutput string, ect string, priority string) {
-	commands.ExecCrashOnError("nft", "add", "table", "inet", nftTable)
+func CreateNftRuleECT(dev string, nftTable string, chainForward string, chainOutput string, ect string, priority string) error {
+	if res := commands.ExecCommand("nft", "add", "table", "inet", nftTable); res.Error() != nil {
+		return res.Error()
+	}
 
-	commands.ExecCrashOnError("nft", "add", "chain", "inet", nftTable, chainForward, "{", "type", "filter", "hook", "forward", "priority", priority, ";}")
+	if res := commands.ExecCommand("nft", "add", "chain", "inet", nftTable, chainForward, "{", "type", "filter", "hook", "forward", "priority", priority, ";}"); res.Error() != nil {
+		return res.Error()
+	}
 
-	commands.ExecCrashOnError("nft", "add", "chain", "inet", nftTable, chainOutput, "{", "type", "filter", "hook", "output", "priority", priority, ";}")
+	if res := commands.ExecCommand("nft", "add", "chain", "inet", nftTable, chainOutput, "{", "type", "filter", "hook", "output", "priority", priority, ";}"); res.Error() != nil {
+		return res.Error()
+	}
 
-	commands.ExecCrashOnError("nft", "add", "rule", "inet", nftTable, chainForward, "ip", "ecn", "set", ect, "oifname", dev)
-	commands.ExecCrashOnError("nft", "add", "rule", "inet", nftTable, chainOutput, "ip", "ecn", "set", ect, "oifname", dev)
+	if res := commands.ExecCommand("nft", "add", "rule", "inet", nftTable, chainForward, "ip", "ecn", "set", ect, "oifname", dev); res.Error() != nil {
+		return res.Error()
+	}
 
-	INFO.Printf("enabled nft rules for %s %s", nftTable, ect)
+	if res := commands.ExecCommand("nft", "add", "rule", "inet", nftTable, chainOutput, "ip", "ecn", "set", ect, "oifname", dev); res.Error() != nil {
+		return res.Error()
+	}
+
+	DEBUG.Printf("enabled nft rules for %s %s", nftTable, ect)
+	return nil
 }
 
 func ResetECTMarking(nftTable string) {
-	cmd := exec.Command("nft", "delete", "table", "inet", nftTable)
-	runCommand(cmd)
-	INFO.Printf("reset nft ect1 %s", nftTable)
-}
-
-func runCommand(cmd *exec.Cmd) {
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		INFO.Printf("%s -> %s; NOT CRASHING.", cmd.Args, err)
+	res := commands.ExecCommand("nft", "delete", "table", "inet", nftTable)
+	err := res.Error()
+	if err != nil {
+		WARN.Println(err)
 	}
 }
