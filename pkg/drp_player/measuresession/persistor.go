@@ -104,6 +104,8 @@ func (s *MeasureSessionPersistor) close() {
 		s.csv.PacketFile.Close()
 	}
 	(*s.db).Commit()
+}
+func (s *MeasureSessionPersistor) Exit() {
 	close(s.exit_persistor)
 }
 func (s *MeasureSessionPersistor) persist(sample interface{}) error {
@@ -152,15 +154,16 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 		select {
 		case <-s.exit_persistor:
 			s.close()
+			done()
 			return
 		case <-tickerPersist.C:
-			DEBUG.Println("Ticker")
 			readSamples := true
 			for readSamples {
 				select {
 				case sampleInterface, ok := <-samples:
 					if !ok {
 						DEBUG.Println("Closing persistor due to closed channel")
+						s.close()
 						done()
 						return
 					}
