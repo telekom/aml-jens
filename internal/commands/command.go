@@ -31,44 +31,45 @@ import (
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-// ExecReturnOutput executes 'name' with args
-// returns its output in string-form.
-// If the program 'name' returns != 0
-//
-//	!!! --  The Program will CRASH -- !!!
-func ExecCrashOnError(name string, arg ...string) {
-	err := execCmd(exec.Command(name, arg...))
-	if err != nil {
-		FATAL.Printf("Executing: %s, %v", name, arg)
-		FATAL.Printf("Error executing %s", name)
-		FATAL.Exit(err)
-	}
+type CommandResult struct {
+	s_out       string
+	s_err       string
+	err         error
+	command_str string
 }
 
-func execCmdOutput(cmd *exec.Cmd) (string, error) {
+//go:inline
+func (s CommandResult) StdOut() string {
+	return s.s_out
+}
+
+//Will return an error if result was not successful
+//Else: nil
+//go:inline
+func (s CommandResult) Error() error {
+	if s.err == nil {
+		return nil
+	}
+	return fmt.Errorf("command '%s', [stdout:'%s', stderr:'%s'] failed: %w", s.command_str, s.s_out, s.s_err, s.err)
+}
+
+// ExecReturnOutput executes 'name' with args
+// returns CommandResult.
+func ExecCommand(name string, arg ...string) CommandResult {
+	return execCmd(exec.Command(name, arg...))
+
+}
+
+func execCmd(cmd *exec.Cmd) CommandResult {
 	var out bytes.Buffer
+	var outE bytes.Buffer
 	cmd.Stdout = &out
-	cmd.Stderr = &out
+	cmd.Stderr = &outE
 	err := cmd.Run()
-	if err != nil {
-		message := fmt.Sprintf("error exec command %s error: %s\n", cmd, err.Error())
-		DEBUG.Print(message)
-		DEBUG.Println(out.String())
-		return "", err
+	return CommandResult{
+		err:         err,
+		s_out:       out.String(),
+		s_err:       outE.String(),
+		command_str: cmd.String(),
 	}
-	return out.String(), nil
-}
-
-func execCmd(cmd *exec.Cmd) error {
-	cmd.Stdout = nil
-
-	return cmd.Run()
-}
-
-// ExecReturnOutput executes 'name' with args
-// returns its output in string-form.
-// If the program 'name' returns != 0
-// error gets set
-func ExecReturnOutput(name string, arg ...string) (string, error) {
-	return execCmdOutput(exec.Command(name, arg...))
 }

@@ -30,10 +30,10 @@ import (
 )
 
 func get_user() string {
-	r, err := commands.ExecReturnOutput("bash", "-c", assets.CMD_GET_USERS)
+	res := commands.ExecCommand("bash", "-c", assets.CMD_GET_USERS)
 
-	if err == nil {
-		lines := strings.Split(r, "\n")
+	if res.Error() == nil {
+		lines := strings.Split(res.StdOut(), "\n")
 		lines = lines[:len(lines)-1]
 		switch cnt := len(lines); {
 		case cnt == 1:
@@ -54,12 +54,12 @@ func get_gateway(usr string) string {
 		INFO.Printf("Invalid usr: %s, defaulting\n", usr)
 		return "jens"
 	}
-	r, err := commands.ExecReturnOutput("bash", "-c", fmt.Sprintf(assets.CMD_GET_GATEWAY, usr))
-	if err != nil {
+	res := commands.ExecCommand("bash", "-c", fmt.Sprintf(assets.CMD_GET_GATEWAY, usr))
+	if err := res.Error(); err != nil {
 		INFO.Printf("Could not determine Gateway: %s\n", err)
 		return "localhost"
 	}
-	return strings.TrimRight(r, "\n")
+	return strings.TrimRight(res.StdOut(), "\n")
 }
 
 func isIpOrJens(adr string) bool {

@@ -110,7 +110,10 @@ func NewTrafficControl(dev string) *TrafficControl {
 func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartParams) error {
 	ResetECTMarking(assets.NFT_TABLE_PREMARK)
 	if nft.L4sPremarking {
-		CreateNftRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
+		err := CreateNftRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := params.validate(); err != nil {
@@ -124,11 +127,11 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	args = append(args, params.asArgs()...)
 
 	DEBUG.Printf("Starting tc: %+v", args)
-	res, err := commands.ExecReturnOutput("tc", args...)
-	if err != nil {
-		INFO.Printf("'tc %+v' -> %s", args, res)
-		return err
+	res := commands.ExecCommand("tc", args...)
+	if res.Error() != nil {
+		return res.Error()
 	}
+	var err error
 	tc.control_file, err = os.OpenFile(CTRL_FILE, os.O_WRONLY, os.ModeAppend)
 	return err
 }
@@ -140,8 +143,7 @@ func (tc *TrafficControl) CurrentRate() float64 {
 
 // Rests Qdisc to default
 func (tc *TrafficControl) Reset() error {
-	_, err := commands.ExecReturnOutput("tc", "qdisc", "delete", "dev", tc.dev, "root")
-	return err
+	return commands.ExecCommand("tc", "qdisc", "delete", "dev", tc.dev, "root").Error()
 }
 
 // Closes all open contexts; Resets NFT_TABLE, tc markings etc.
@@ -156,11 +158,12 @@ func (tc *TrafficControl) Close() error {
 		ResetECTMarking(assets.NFT_TABLE_SIGNAL)
 	}
 
-	if err := tc.Reset(); err != nil {
-		WARN.Printf("Could not reset TC in Close(): %v", err)
-	}
-	if err := tc.control_file.Close(); err != nil {
-		WARN.Printf("Could not close control_file TC in Close(): %v", err)
+	_ = tc.Reset()
+	if err := tc.control_file.Close(); err == nil {
+		//This is to be expected: File gets closed beforehand
+		WARN.Printf("control_file TC had to be closed")
+	} else {
+		DEBUG.Printf("Could not close control_file TC, %s", err)
 	}
 	return nil
 }
@@ -187,7 +190,11 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatype
 	if tc.nft.SignalStart {
 		go func() {
 			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
-			CreateNftRuleECT(tc.dev, assets.NFT_TABLE_SIGNAL, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect0", "1")
+			err := CreateNftRuleECT(tc.dev, assets.NFT_TABLE_SIGNAL, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect0", "1")
+			if err != nil {
+				r.ReportFatal(err)
+				return
+			}
 			<-time.NewTimer(200 * time.Millisecond).C
 			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
 		}()
