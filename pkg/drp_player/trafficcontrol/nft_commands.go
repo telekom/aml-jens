@@ -53,7 +53,7 @@ func CreateNftRuleECT(dev string, nftTable string, chainForward string, chainOut
 func ResetECTMarking(nftTable string) {
 	res := commands.ExecCommand("nft", "delete", "table", "inet", nftTable)
 	err := res.Error()
-	if err != nil {
+	if res.StdErr() != "Error: Could not process rule: No such file or directory\ndelete table inet premarkect1\n                  ^^^^^^^^^^^\n" {
 		WARN.Println(err)
 	}
 }
