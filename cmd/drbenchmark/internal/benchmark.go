@@ -73,11 +73,9 @@ func New(benchmark *datatypes.DB_benchmark) *Benchmark {
 	}
 }
 func (b *Benchmark) SkipSession() {
-	DEBUG.Println("Skipping session")
 	if b.player != nil {
 		b.was_skipped = true
 		b.player.ExitNoWait()
-		DEBUG.Println("Skipping session success")
 	}
 }
 func (b *Benchmark) Play() (err error) {

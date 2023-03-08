@@ -171,7 +171,7 @@ func (s *DataBase) persist_measure_packet(data datatypes.DB_measure_packet) erro
 	if data.Capacitykbits == 0 {
 		//Do not persist samples where capacity is 0
 		//This should only happen during warmup
-		INFO.Println("Not persisting, capacity = 0")
+		//DEBUG.Println("Not persisting, capacity = 0")
 		return nil
 	}
 	_, err := s.stmt_packet.Exec(data.GetSQLArgs()...)
