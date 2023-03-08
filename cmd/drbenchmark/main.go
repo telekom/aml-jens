@@ -156,10 +156,10 @@ func main() {
 	}
 	benchmark := drbenchmark.New(bm)
 	ex := exithandler(benchmark)
+	defer close(ex)
 	if err := benchmark.Play(); err != nil {
 		FATAL.Exit(err)
 		//TODO: Revert Transactions or delete cascade
 	}
-	close(ex)
 
 }
