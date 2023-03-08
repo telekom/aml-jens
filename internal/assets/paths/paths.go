@@ -26,11 +26,18 @@ import (
 	"runtime"
 )
 
+var log_path = "/etc/jens-cli/logs/"
+
 // "/etc/jens-cli/logs/"
 //
 //go:inline
 func LOG_PATH() string {
-	return "/etc/jens-cli/logs/"
+	return log_path
+}
+
+//go:inline
+func LOG_PATH_UPDATE(p string) {
+	log_path = p
 }
 
 // "/etc/jens-cli/"

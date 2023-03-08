@@ -49,16 +49,22 @@ func (clog *customLogger) Prefix() string {
 // Print calls l.Output to print to the logger. Arguments are handled in the manner of fmt.Print.
 func (clog *customLogger) Print(v ...any) {
 	clog.logger.Print(v...)
+	fmt.Fprintln(os.Stderr, "Something went wrong:")
+	fmt.Fprint(os.Stderr, v...)
 }
 
 // Println calls l.Output to print to the logger. Arguments are handled in the manner of fmt.Println.
 func (clog *customLogger) Println(v ...any) {
 	clog.logger.Println(v...)
+	fmt.Fprintln(os.Stderr, "Something went wrong:")
+	fmt.Fprintln(os.Stderr, v...)
 }
 
 // Printf calls l.Output to print to the logger. Arguments are handled in the manner of fmt.Printf.
 func (clog *customLogger) Printf(format string, v ...any) {
 	clog.logger.Printf(format, v...)
+	fmt.Fprintln(os.Stderr, "Something went wrong:")
+	fmt.Fprintf(os.Stderr, format, v...)
 }
 
 // SetOutput sets the output destination for the logger.
@@ -99,12 +105,10 @@ func (clog *customLogger) Exit(v ...any) {
 	}
 	b.WriteRune('\n')
 	//clog.logger.Print(v...)
-	fmt.Fprint(
-		clog.logger.Writer(),
-		b.String())
-	clog.logger.Println("The above exception has caused the program to exit.")
+	clog.Print(b.String())
+	clog.Println("The above exception has caused the program to exit.")
 	clog.do_exit()
-	clog.logger.Println("Term")
+	clog.Println("Term")
 }
 
 // Exitln calls l.Output to print to the logger and potentially exit. Arguments are handled in the manner of fmt.Println.
