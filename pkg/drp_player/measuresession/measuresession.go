@@ -63,11 +63,14 @@ type AggregateMeasure struct {
 	sumEcnNCE        uint32
 	sumDropped       uint32
 	net_flow         *datatypes.DB_network_flow
+	t_start          uint64
+	t_end            uint64
 }
 
 func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 	var sampleCapacityKbits uint32
-	loadKbits := ((s.sumloadBytes * 8) / 1000) * (1000 / SAMPLE_DURATION_MS)
+	sample_duration := util.MaxInt(SAMPLE_DURATION_MS, int(s.t_end-s.t_start))
+	loadKbits := ((s.sumloadBytes * 8) / 1000) * (1000 / uint32(sample_duration))
 	if s.sumCapacityKbits == -1 {
 		sampleCapacityKbits = loadKbits
 	} else {
@@ -86,10 +89,23 @@ func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 }
 
 func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
-	return &AggregateMeasure{sumloadBytes: 0, sumDropped: 0, sumEcnNCE: 0, sumSojournTimeMs: 0, sampleCount: 0, net_flow: flow}
+	return &AggregateMeasure{
+		sumloadBytes:     0,
+		sumDropped:       0,
+		sumEcnNCE:        0,
+		sumSojournTimeMs: 0,
+		sampleCount:      0,
+		net_flow:         flow,
+		t_start:          0,
+		t_end:            0,
+	}
 }
 
 func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
+	if s.t_start == 0 {
+		s.t_start = pm.timestampMs
+	}
+	s.t_end = pm.timestampMs
 	if pm.drop {
 		s.sumDropped++
 		DEBUG.Printf("D: %+v", pm)
@@ -313,7 +329,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 					break
 				}
 				diffMs := int64(message.timestampMs - packetStartTimeMs)
-				if diffMs > sampleDuration.Milliseconds() {
+				if diffMs >= sampleDuration.Milliseconds() {
 					readMessages = false
 				}
 				if err := (*p).Persist(message.net_flow); err != nil {
@@ -355,14 +371,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 					continue
 				}
 			}
-			select {
-			case m.chan_to_persistence <- sample:
-			default:
-			}
-
-			//if m.session.ParentBenchmark.PrintToStdOut {
-			//	  sample.PrintLine()
-			//}
+			m.chan_to_persistence <- sample
 		}
 	}
 }
