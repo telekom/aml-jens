@@ -139,18 +139,6 @@ func validate(t *testing.T, set []int, sess *datatypes.DB_session, cleanup func(
 		}
 
 	}
-	/*
-		if err, pers := persistence.GetPersistence(); err != nil && reflect.TypeOf(pers) == reflect.TypeOf(psql.DataBase{}) {
-			if contains(set, 5) {
-				cleanup()
-				t.Fatalf(caseA, 5, "-psql")
-			} else {
-				cleanup()
-				t.Fatalf(caseB, 5, "-psql")
-			}
-
-		}
-	*/
 
 	if sess.ChildDRP.Initial_scale != 0.36 {
 		if contains(set, 5) {
