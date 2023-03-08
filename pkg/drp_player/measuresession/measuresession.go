@@ -90,7 +90,11 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 }
 
 func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
-
+	if pm.drop {
+		s.sumDropped++
+		DEBUG.Printf("D: %+v", pm)
+		return
+	}
 	// aggregate sample values
 	s.sumSojournTimeMs += pm.sojournTimeMs
 	s.sumloadBytes += pm.packetSizeByte
@@ -107,7 +111,6 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
 	if pm.ecnOut == 3 {
 		s.sumEcnNCE++
 	}
-	s.sumDropped += uint32(bool2int[pm.drop])
 	s.sampleCount++
 }
 
@@ -253,7 +256,7 @@ func (m *MeasureSession) poll(r util.RoutineReport) {
 				m.chan_to_aggregation <- *packetMeasure
 
 			} else {
-				DEBUG.Printf("non ip packet ignored\n")
+				//DEBUG.Printf("non ip packet ignored\n")
 			}
 		case RECORD_TYPE_Q: // QueueMeasure MQ
 			numberOfPacketsInQueue := uint16(binary.LittleEndian.Uint16(recordArray[10:12]))
