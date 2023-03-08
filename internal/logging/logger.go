@@ -24,11 +24,13 @@ package logging
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	rlog "log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/assets/paths"
@@ -79,8 +81,16 @@ func InitLogger(name string) {
 // Init Logger while also specifiytig the path
 func initLogger(name string, path string) {
 	var err error
-	err = os.MkdirAll(path, 0666)
+	err = os.MkdirAll(path, 0777)
+
 	if err != nil {
+		e, ok := err.(*fs.PathError)
+		if ok && e.Err == syscall.EACCES {
+			INFO.Printf("Could not Access '%s', tying '/tmp/logs'", path)
+			paths.LOG_PATH_UPDATE("/tmp/logs")
+			InitLogger(name)
+			return
+		}
 		fmt.Fprintln(os.Stderr, "COULD NOT INIT LOGGER")
 		fmt.Fprint(os.Stderr, err)
 		os.Exit(-1)
@@ -99,7 +109,7 @@ func initLogger(name string, path string) {
 	}
 	singelton_info_logger.SetOutput(fp)
 	singelton_warn_logger.SetOutput(fp)
-	singelton_fatal_logger.SetOutput(io.MultiWriter(fp, os.Stderr))
+	singelton_fatal_logger.SetOutput(fp)
 	debug_mode, err := strconv.ParseBool(os.Getenv("JENS_DEBUG"))
 	if err == nil && debug_mode {
 		singelton_debug_logger.SetOutput(fp)
