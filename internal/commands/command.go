@@ -25,7 +25,6 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"github.com/telekom/aml-jens/internal/logging"
 )
@@ -44,11 +43,6 @@ func (s CommandResult) StdOut() string {
 	return s.s_out
 }
 
-//go:inline
-func (s CommandResult) StdErr() string {
-	return s.s_err
-}
-
 //Will return an error if result was not successful
 //Else: nil
 //go:inline
@@ -56,9 +50,7 @@ func (s CommandResult) Error() error {
 	if s.err == nil {
 		return nil
 	}
-	clean := func(s string) string { return strings.ReplaceAll(s, "\n", "\\n") }
-
-	return fmt.Errorf("command '%s', [stdout:'%s', stderr:'%s'] failed: %w", s.command_str, clean(s.s_out), clean(s.s_err), s.err)
+	return fmt.Errorf("command '%s', [stdout:'%s', stderr:'%s'] failed: %w", s.command_str, s.s_out, s.s_err, s.err)
 }
 
 // ExecReturnOutput executes 'name' with args

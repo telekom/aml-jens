@@ -131,7 +131,6 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	if res.Error() != nil {
 		return res.Error()
 	}
-	tc.current_data_rate = float64(params.Datarate)
 	var err error
 	tc.control_file, err = os.OpenFile(CTRL_FILE, os.O_WRONLY, os.ModeAppend)
 	return err
@@ -144,11 +143,7 @@ func (tc *TrafficControl) CurrentRate() float64 {
 
 // Rests Qdisc to default
 func (tc *TrafficControl) Reset() error {
-	err := commands.ExecCommand("tc", "qdisc", "delete", "dev", tc.dev, "root")
-	if err.Error() != nil && err.StdErr() != "Error: Cannot delete qdisc with handle of zero.\n" {
-		return err.Error()
-	}
-	return nil
+	return commands.ExecCommand("tc", "qdisc", "delete", "dev", tc.dev, "root").Error()
 }
 
 // Closes all open contexts; Resets NFT_TABLE, tc markings etc.
