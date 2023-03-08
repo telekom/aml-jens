@@ -27,7 +27,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	drbenchmark "github.com/telekom/aml-jens/cmd/drbenchmark/internal"
@@ -121,6 +123,23 @@ func askTag() (string, error) {
 	return fmt.Sprintf("%s - L4S: %t", alg[:len(alg)-1], l4s_enabled), nil
 
 }
+func exithandler(bm *drbenchmark.Benchmark) chan uint8 {
+	exit := make(chan uint8)
+	exit_handler := make(chan os.Signal)
+	signal.Notify(exit_handler, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT)
+	go func() {
+		for {
+			select {
+			case <-exit:
+				return
+			case <-exit_handler:
+				bm.SkipSession()
+			}
+		}
+	}()
+	return exit
+}
+
 func main() {
 	logging.InitLogger(assets.NAME_DRBENCH)
 	bm, err := ArgParse()
@@ -135,9 +154,12 @@ func main() {
 	if err != nil {
 		FATAL.Exit(err)
 	}
-	if err := drbenchmark.Play(bm); err != nil {
+	benchmark := drbenchmark.New(bm)
+	ex := exithandler(benchmark)
+	if err := benchmark.Play(); err != nil {
 		FATAL.Exit(err)
 		//TODO: Revert Transactions or delete cascade
 	}
+	close(ex)
 
 }

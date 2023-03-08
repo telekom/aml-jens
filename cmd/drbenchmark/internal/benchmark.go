@@ -36,6 +36,12 @@ import (
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
+type Benchmark struct {
+	player      *drplay.DrpPlayer
+	bm          *datatypes.DB_benchmark
+	was_skipped bool
+}
+
 func formatDropDownMessage(i int, max int, indent int) {
 	p := ""
 	switch indent {
@@ -59,8 +65,22 @@ func formatDropDownMessage(i int, max int, indent int) {
 		}
 	}
 }
-
-func Play(benchmark *datatypes.DB_benchmark) (err error) {
+func New(benchmark *datatypes.DB_benchmark) *Benchmark {
+	return &Benchmark{
+		player:      nil,
+		bm:          benchmark,
+		was_skipped: false,
+	}
+}
+func (b *Benchmark) SkipSession() {
+	DEBUG.Println("Skipping session")
+	if b.player != nil {
+		b.was_skipped = true
+		b.player.ExitNoWait()
+		DEBUG.Println("Skipping session success")
+	}
+}
+func (b *Benchmark) Play() (err error) {
 	/*
 	 *    Prep work
 	 */
@@ -70,20 +90,20 @@ func Play(benchmark *datatypes.DB_benchmark) (err error) {
 	}
 	gw := util.RetrieveMostLikelyGatewayIp()
 	playtime := 0
-	for _, v := range benchmark.Sessions {
+	for _, v := range b.bm.Sessions {
 		playtime += v.ChildDRP.GetEstimatedPlaytime()
 		playtime += 2
 	}
-	err = (*db).Persist(benchmark)
+	err = (*db).Persist(b.bm)
 	if err != nil {
 		FATAL.Exit(err)
 	}
 	fmt.Println("┏╸Starting the benchmark")
-	fmt.Printf("┃  ┣╸Name:        %s\n", benchmark.Name)
-	fmt.Printf("┃  ┣╸Tag:         %s\n", benchmark.Tag)
-	fmt.Printf("┃  ┣╸Hash:        %s\n", benchmark.GetHashFromLoadedJson())
+	fmt.Printf("┃  ┣╸Name:        %s\n", b.bm.Name)
+	fmt.Printf("┃  ┣╸Tag:         %s\n", b.bm.Tag)
+	fmt.Printf("┃  ┣╸Hash:        %s\n", b.bm.GetHashFromLoadedJson())
 	fmt.Printf("┃  ┣╸Esti. Time:  %ds\n", playtime)
-	fmt.Printf("┃  ┗╸BenchmarkID: %d\n", benchmark.Benchmark_id)
+	fmt.Printf("┃  ┗╸BenchmarkID: %d\n", b.bm.Benchmark_id)
 	/*
 		fmt.Printf("┣╸Warmup: Estimating max bitrate (≈%ds)\n", summary.Definition.Inner.MaxBitrateEstimationTimeS)
 		if err = summary.Warmup(); err != nil {
@@ -95,8 +115,8 @@ func Play(benchmark *datatypes.DB_benchmark) (err error) {
 	 *    Start playing each session
 	 */
 	fmt.Println("┣╸Beginning with Sessions")
-	session_count := len(benchmark.Sessions)
-	for i, v := range benchmark.Sessions {
+	session_count := len(b.bm.Sessions)
+	for i, v := range b.bm.Sessions {
 		v.Time = uint64(time.Now().UnixMilli())
 		config.PlayCfg().A_Session = v
 		err := (*db).Persist(v)
@@ -108,17 +128,28 @@ func Play(benchmark *datatypes.DB_benchmark) (err error) {
 
 		time.Sleep(2 * time.Second)
 		v.Time = uint64(time.Now().UnixMilli())
-		player := drplay.NewDrpPlayer(v)
-		player.Start()
+		b.player = drplay.NewDrpPlayer(v)
+		err = b.player.Start()
+		if err != nil {
+			return err
+		}
+		b.player.Wait()
 		(*db).ClearCache()
 		_, start_t, end_t, err := (*db).GetSessionStats(v.Session_id)
 		if err != nil {
 			return err
 		}
-		fmt.Println(" ✓")
-		formatDropDownMessage(1, 2, 2)
-		fmt.Printf(assets.URL_BASE_G_MONITORING+assets.URL_ARGS_G_MONITORING+"\n",
-			gw, v.Session_id, start_t, end_t)
+		if !b.was_skipped {
+			fmt.Println(" ✓")
+			formatDropDownMessage(1, 2, 2)
+			fmt.Printf(assets.URL_BASE_G_MONITORING+assets.URL_ARGS_G_MONITORING+"\n",
+				gw, v.Session_id, start_t, end_t)
+		} else {
+			fmt.Println(" ✖")
+			formatDropDownMessage(1, 2, 2)
+			fmt.Println("User Interrupt")
+			b.was_skipped = false
+		}
 
 	}
 	/*
@@ -127,6 +158,6 @@ func Play(benchmark *datatypes.DB_benchmark) (err error) {
 	fmt.Println("┣╸Summarizing benchmark")
 	formatDropDownMessage(1, 2, 1)
 	fmt.Printf(assets.URL_BASE_G_OVERVIEW+assets.URL_ARGS_G_OVERVIEW+"\n",
-		gw, benchmark.Benchmark_id)
+		gw, b.bm.Benchmark_id)
 	return (*db).Close()
 }
