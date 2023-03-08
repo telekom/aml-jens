@@ -150,14 +150,15 @@ func ReadDrpValuesWithFallbacks(fb *datatypes.DB_data_rate_pattern, drp ...*DrPl
 func LoadDB_benchmarkFromJson(path string) (*datatypes.DB_benchmark, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Could not read file (%w)", err)
 	}
 	defintion, hash, err := LoadBenchmarkDefinitionFromJsonData(data)
 	if err != nil {
-		return nil, err
+		WARN.Println(err)
+		return nil, fmt.Errorf("Supplied path is not a valid json (%w)", err)
 	}
 	if err := defintion.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Contents of json could not be validated (%w)", err)
 	}
 	play_cfg := config.PlayCfg()
 	benchmark := &datatypes.DB_benchmark{

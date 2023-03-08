@@ -82,7 +82,7 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	}
 	res, err := jsonp.LoadDB_benchmarkFromJson(benchmark)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Could not load Benchmark from json: %w", err)
 	}
 	res.Tag = tag
 	if _, err := net.InterfaceByName(dev); err != nil {
@@ -144,22 +144,23 @@ func main() {
 	logging.InitLogger(assets.NAME_DRBENCH)
 	bm, err := ArgParse()
 	if err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		return
 	}
 	if err := bm.Validate(); err != nil {
 		FATAL.Println("Benchmark Validation failed")
-		FATAL.Exit(err)
+		return
 	}
 	err = persistence.SetPersistenceTo(&psql.DataBase{}, &config.PlayCfg().Psql)
 	if err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		return
 	}
 	benchmark := drbenchmark.New(bm)
 	ex := exithandler(benchmark)
 	defer close(ex)
 	if err := benchmark.Play(); err != nil {
-		FATAL.Exit(err)
-		//TODO: Revert Transactions or delete cascade
+		FATAL.Println(err)
+		os.Exit(-1)
 	}
-
 }
