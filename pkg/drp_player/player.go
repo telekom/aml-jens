@@ -136,10 +136,13 @@ func (s *DrpPlayer) close_channel() {
 	s.close_channel_mutex.Unlock()
 
 }
-
-func (s *DrpPlayer) Exit() {
+func (s *DrpPlayer) ExitNoWait() {
 	DEBUG.Println("DrpPlayer was asked to Exit()")
 	s.close_channel()
+}
+
+func (s *DrpPlayer) Exit() {
+	s.ExitNoWait()
 	DEBUG.Println("Waiting for routines to end")
 	s.Wait()
 	DEBUG.Println("Player has exited")
