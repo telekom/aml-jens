@@ -107,7 +107,6 @@ func (s *DrpPlayer) Start() error {
 	return nil
 }
 func (s *DrpPlayer) exit_clean() {
-	DEBUG.Println("exit_clean")
 	if err := s.tc.Close(); err != nil {
 		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
 	}
@@ -122,6 +121,7 @@ func (s *DrpPlayer) exit_clean() {
 func (s *DrpPlayer) Wait() {
 	s.r.Wg.Wait()
 	s.exit_clean()
+	DEBUG.Println("Player has exited")
 }
 func (s *DrpPlayer) close_channel() {
 	s.close_channel_mutex.Lock()
@@ -143,9 +143,7 @@ func (s *DrpPlayer) ExitNoWait() {
 
 func (s *DrpPlayer) Exit() {
 	s.ExitNoWait()
-	DEBUG.Println("Waiting for routines to end")
 	s.Wait()
-	DEBUG.Println("Player has exited")
 }
 func (s *DrpPlayer) initTC() error {
 	s.tc = trafficcontrol.NewTrafficControl(s.session.Dev)

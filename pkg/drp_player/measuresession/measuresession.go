@@ -108,7 +108,7 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
 	s.t_end = pm.timestampMs
 	if pm.drop {
 		s.sumDropped++
-		DEBUG.Printf("D: %+v", pm)
+		//DEBUG.Printf("D: %+v", pm)
 		return
 	}
 	// aggregate sample values
@@ -193,7 +193,6 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 
 	go func() {
 		<-r.On_extern_exit_c
-		DEBUG.Println("ShouldExit=True")
 		m.should_end = true
 		m.persistor.Exit()
 	}()
