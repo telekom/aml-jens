@@ -1,0 +1,38 @@
+{
+  "Hash": "",
+  "Inner": {
+    "Name": "TEST",
+    "Max_application_bitrate": 0,
+    "MaxBitrateEstimationTimeS": 1,
+    "Patterns": [
+      {
+        "Path": "./testdata/drp/drp_3valleys.csv",
+        "Setting": {
+          "TC": {
+            "Markfree": 2,
+            "Markfull": 4,
+            "Queuesizepackets": 10003,
+            "Extralatency": 2,
+            "SignalDrpStart": true,
+            "L4sEnablePremarking": true
+          },
+          "DRP": {
+            "Frequency": 42,
+            "Scale": 0.42,
+            "MinRateKbits": 4200,
+            "WarmupBeforeDrpMs": 42
+          }
+        }
+      }
+    ],
+    "DrplaySetting": {
+      "TC": {
+        "Markfree": 6,
+        "Markfull": 76
+      },
+      "DRP": {
+        "Scale": 1
+      }
+    }
+  }
+}

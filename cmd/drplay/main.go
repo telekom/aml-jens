@@ -23,23 +23,31 @@ package main
 
 import (
 	"flag"
-	"jens/drcommon/assets"
-	"jens/drcommon/config"
-	"jens/drcommon/logging"
-	"jens/drcommon/persistence"
-	"jens/drcommon/persistence/datatypes"
-	"jens/drcommon/persistence/mock"
-	"jens/drcommon/persistence/psql"
-	"jens/drcommon/updater"
-	"jens/drplay"
+	"fmt"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
+
+	"github.com/telekom/aml-jens/internal/assets"
+	"github.com/telekom/aml-jens/internal/config"
+	"github.com/telekom/aml-jens/internal/logging"
+	"github.com/telekom/aml-jens/internal/persistence"
+	"github.com/telekom/aml-jens/internal/persistence/datatypes"
+	"github.com/telekom/aml-jens/internal/persistence/mock"
+	"github.com/telekom/aml-jens/internal/persistence/psql"
+	"github.com/telekom/aml-jens/pkg/drp"
+	drplay "github.com/telekom/aml-jens/pkg/drp_player"
 )
 
-var DEBUG, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func ArgParse() (err error) {
 	result := config.PlayCfg().A_Session
+	var looping bool
 	// parse parameters
+	version := flag.Bool("v", false, "prints build version")
 	flag.StringVar(
 		&(result.Dev),
 		"dev",
@@ -63,7 +71,7 @@ func ArgParse() (err error) {
 		time.Now().Format("2006.01.02 15:04:05"),
 		"tag of this measure session")
 	flag.BoolVar(
-		&result.ChildDRP.Loop,
+		&looping,
 		"loop",
 		false,
 		"defines if data rate pattern player should run in an endless loop")
@@ -74,7 +82,7 @@ func ArgParse() (err error) {
 		"output measure records to csv file")
 
 	flag.Float64Var(
-		&result.ChildDRP.Scale,
+		&result.ChildDRP.Initial_scale,
 		"scale",
 		1,
 		"defines a scale factor which will be used to multiply the drp;  must be greater 0.1")
@@ -91,6 +99,11 @@ func ArgParse() (err error) {
 		"only play drp, no queue measures are recorded")
 
 	flag.Parse()
+	if *version {
+		fmt.Printf("Version      : %s\n", assets.VERSION)
+		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
+		os.Exit(0)
+	}
 	if result.Dev == "" {
 		logging.FlagParseExit("Flag: 'dev' was not set")
 	}
@@ -105,15 +118,32 @@ func ArgParse() (err error) {
 			return err
 		}
 	}
+	err = result.ChildDRP.ParseDRP(drp.NewDataRatePatternFileProvider(*pattern_path))
+	result.ChildDRP.SetLooping(looping)
+	return err
+}
 
-	return result.ChildDRP.ParseDrpFile(*pattern_path)
+func exithandler(player *drplay.DrpPlayer, exit chan uint8) {
+
+	exit_handler := make(chan os.Signal)
+	signal.Notify(exit_handler, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT)
+	go func() {
+		select {
+		case <-exit:
+			return
+		case sig := <-exit_handler:
+			INFO.Printf("Received Signal: %d", sig)
+			player.Exit()
+
+		}
+
+	}()
 }
 
 func main() {
 	logging.InitLogger(assets.NAME_DRPLAY)
-	logging.EnableDebug()
-	updater.DisplayUpdateMsgIfNewerVersion()
-
+	INFO.Printf("===>Starting DrPlay @%s <===\n\n", time.Now().String())
+	var player_has_ended = make(chan uint8)
 	if err := ArgParse(); err != nil {
 		FATAL.Println("Error during Argparse")
 		FATAL.Exit(err)
@@ -121,14 +151,34 @@ func main() {
 	session := config.PlayCfg().A_Session
 	db, err := persistence.GetPersistence()
 	if err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		os.Exit(4)
 	}
 	err = (*db).Persist(session)
 	if err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		os.Exit(1)
 	}
-	drplay.StartDrpPlayer(session)
+	player := drplay.NewDrpPlayer(session)
+
+	//Todo should be done in caller, not callee
+	logging.LinkExitFunction(func() uint8 {
+		FATAL.Println("Logger experienced a fatal error")
+		player.Exit()
+		panic("A")
+		//return 255
+	}, 5000)
+	exithandler(player, player_has_ended)
+	err = player.Start()
+	if err != nil {
+		FATAL.Println(err)
+		os.Exit(-1)
+	}
+	player.Wait()
+	close(player_has_ended)
 	if err := (*db).Close(); err != nil {
-		FATAL.Exit(err)
+		FATAL.Println(err)
+		os.Exit(2)
 	}
+	fmt.Println(strings.Join(assets.END_OF_DRPLAY[:], " "))
 }

@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -24,14 +24,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"jens/drcommon/assets"
-	"jens/drcommon/logging"
-	"jens/drcommon/updater"
-	"jens/drshow/modes/file"
-	"jens/drshow/modes/folder"
-	pipe "jens/drshow/modes/pipe"
 	"os"
 	"strings"
+
+	"github.com/telekom/aml-jens/cmd/drshow/internal/modes/file"
+	"github.com/telekom/aml-jens/cmd/drshow/internal/modes/folder"
+	"github.com/telekom/aml-jens/cmd/drshow/internal/modes/pipe"
+	"github.com/telekom/aml-jens/internal/assets"
+	"github.com/telekom/aml-jens/internal/logging"
 )
 
 type mode uint8
@@ -43,7 +43,7 @@ const (
 	mode_help
 )
 
-var _, INFO, FATAL = logging.GetLogger()
+var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 func parseArgs(res *string) (mode, error) {
 	Nargs := len(os.Args) - 1
@@ -51,7 +51,8 @@ func parseArgs(res *string) (mode, error) {
 	if Nargs == 0 {
 		return mode_pipe, nil
 	}
-	first_arg_is_help := helpstringMap[strings.ToUpper(os.Args[1])]
+	upper_arg := strings.ToUpper(os.Args[1])
+	first_arg_is_help := helpstringMap[upper_arg]
 	if Nargs > 2 {
 		return mode_err, errors.New("invalid Arguments. See man pages or drshow --help for more info")
 	}
@@ -61,13 +62,18 @@ func parseArgs(res *string) (mode, error) {
 		INFO.Println("Displaying help: " + *res)
 		return mode_help, nil
 	}
+	if verstionstringMap[upper_arg] {
+		fmt.Printf("Version      : %s\n", assets.VERSION)
+		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
+		os.Exit(0)
+	}
 	*res = os.Args[Nargs]
 	return mode_static, nil
 }
 
 func main() {
 	logging.InitLogger(assets.NAME_DRSHOW)
-	var ErrorOrNil error = nil
+	var ErrorOrNil error
 	var path string
 
 	mode, err := parseArgs(&path)
@@ -97,7 +103,6 @@ func main() {
 		printHelp(path)
 	}
 
-	updater.DisplayUpdateMsgIfNewerVersion()
 }
 
 func isDirectory(path string) bool {
