@@ -1,0 +1,31 @@
+[tccommands]
+	  markfree=9 #in Millisecond
+	  markfull=90 #in Millisecond
+	  queuesizepackets=10000
+      extralatency=10
+	  l4sEnabledPreMarking=true
+	  signalDrpStart=true
+	
+	[postgres]
+	  dbname = "dbname"
+	  host = "host"
+	  password = "password"
+	  port = 12345
+	  user = "user"
+	
+	[drp]
+	  minRateKbits = 1
+	  WarmupBeforeDrpMs = 9999
+	
+	[drshow]
+	  scalePlots=true #instead of scrolling
+	  exportPath="/tmp"
+	  FilterLevel0Until=1       #Used for filtering of flows in pipemode
+	  FilterLevel1AddUntil=1    #Adds to Level0Until: Min count of flows for filter to kick in action
+	  FilterLevel1MinSamples=1 #Filter minium samples to display flow
+	  FilterLevel1SecsPassed=1 #Or maximum time passed since last sample was received
+	  FilterLevel2AddUntil=2
+	  FilterLevel2MinSamples=2
+	  FilterLevel2SecsPassed=2
+	  FilterLevel3MinSamples=3
+	  FilterLevel3SecsPassed=3

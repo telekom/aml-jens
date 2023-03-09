@@ -1,0 +1,19 @@
+{
+    "Hash":"",
+    "Inner":{
+        "Name":"TEST",
+        "Max_application_bitrate":0,
+        "MaxBitrateEstimationTimeS":1,
+        "Patterns":[{}],
+        "DrplaySetting":{
+            "TC":{
+                "Markfree" : 6,
+                "Markfull" : 76
+            },
+            "DRP":{
+                "Scale": 1,
+                "MinRateKbits": 7600
+            }
+        }
+    }
+}

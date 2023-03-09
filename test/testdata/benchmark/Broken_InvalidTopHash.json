@@ -1,0 +1,14 @@
+{
+    "Hash":"not the hash",
+    "Inner":{
+        "Name":"TEST",
+        "Max_application_bitrate":0,
+        "MaxBitrateEstimationTimeS":1,
+        "Patterns":[
+            {
+                "Path": "./testdata/drp_3valleys.csv",
+                "Hash": "does not matter"
+            }
+        ]
+    }
+}

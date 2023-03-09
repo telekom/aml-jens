@@ -5,21 +5,23 @@ measures of the state of the l4s queue are sampled (10ms) and can be stored (csv
 The data rate pattern is defined in a csv file, an example is provided at /etc/jens-cli/drp_3valleys.csv.
 The command drshow visualizes measures or data rate patterns on a terminal ui.
 
-**The Package provides two executables (`drplay` & `drshow`)**
+**The Package provides tree executables (`drplay` & `drshow` & `drbenchmark`)**
 
 # Installation
 
 ## Prerequisites
-* Hardware AMD64
 * Deactivate `secure boot` option in the BIOS
 * Running Debian system (version: `bullseye`)
 * Installation of docker (if grafana/postgres container should run)
 
 ## Installation on a Debian-System:
 **jens-cli runs on debian linux, it requires an update of kernel packages. This means it cannot be used from within a docker-container.**
+
+**But it can be installed in a VM. following the same steps**
+
 `Root` privileges are required
 
-* Make the JENS package repository visible by executing the script `setupApt.sh`
+* Make the JENS package repository visible by executing the script `scripts/setupApt.sh`
 * Run `apt install jens-cli`
 * The executables drplay drbenchmark and drshow are now ready to be used
   `drplay -dev eno1 -loop | drshow`
@@ -48,11 +50,7 @@ Output e.g.:
 
 ```
 timestampMs sojournTimeMs loadKbits capacityKbits ecnCePercent dropped netflow
-1657796730820 0 0 20668 0 0 192.168.178.101:0-192.168.178.75:0
-1657796731821 0 0 20294 0 0 192.168.178.101:0-192.168.178.75:0
 1657796732546 0 0 20507 0 0 192.168.178.101:22-192.168.178.75:57994
-1657796732821 0 0 20905 0 0 192.168.178.101:0-192.168.178.75:0
-1657796733822 0 0 20116 0 0 192.168.178.101:0-192.168.178.75:0
 1657796734410 0 0 20853 0 0 192.168.178.101:22-192.168.178.75:57994
 1657796734436 0 200 20105 0 0 192.168.178.101:22-192.168.178.75:57994
 1657796734436 0 3100 20105 0 0 192.168.178.101:5201-192.168.178.75:5201
@@ -94,6 +92,9 @@ Various Stats are displayed in a human readable UI.
 ```sh
 drplay [opts] | drshow
 ```
+#### Note
+`drshow` might not react to Ctrl-C in Pipemode if there is no traffic on the interface used together with `drplay`. In this case, for now, close and reopen the terminal window. 
+
 ### Mode 2: StaticMode
 Additional Help: `drshow -h static`
 
@@ -102,13 +103,12 @@ When a directory is choosen, the user can navigate the .csv files and inspect th
 ```sh
 drshow patterns/mydrp.csv
 ```
-
 ## drbenchmark
-Drshow is tool to launch drplay multiple times with set configurations 
+`drshow` is tool to launch drplay multiple times with set configurations 
 
 For help regarding this command see `man drbenchmark` or `drbenchmark --help`.
 
-DrBenchmark uses JSON configurations to define a Benchmark.
+`drbenchmark` uses JSON configurations to define a Benchmark.
 
 ```json
 {
@@ -230,26 +230,6 @@ If docker was installed without root-privileges, you need to expose the ports of
 
 # Annex
 
-## setupApt.sh
-```sh
-#! /bin/sh
-
-echo 'deb [trusted=yes] https://jens.llcto.telekom-dienste.de/ ./' | tee -a /etc/apt/sources.list
-echo '
-Package: iproute2
-Pin: origin jens.llcto.telekom-dienste.de
-Pin-Priority: 1001
-' > /etc/apt/preferences
-
-echo '
-machine https://jens.llcto.telekom-dienste.de/
-login jens_fileserver
-password 3+bEacQgweal0ruf7A6gt2FkoDK0mcNz9y03Lbl3Qkc=
-' > /etc/apt/auth.conf
-
-apt update
-
-```
 ## Sample Test-Setup
 
 ### Requirements:
@@ -261,10 +241,10 @@ apt update
 ### Setup:
 
 #### On the other machine
-1. Launch iperf3 in Servermode (`iperf3 -s`)
+1. Launch iperf3 as server (`iperf3 -s`)
 
 #### On JENS / the ssh connection to JENS
-* Launch `drplay -dev <dev> -psql -tag iperf3-setup-test`
+* Launch `drplay -dev <dev> -psql -tag iperf3-setup-test-ecn1`
   * With `<dev>` being a NIC on JENS (e.g. `wlp0s20f3` or `eno1`or ... )
 * Launch iperf3 as a Client `iperf3 -c <other_machine_ip> --udp -t 100 -i 0.5 -b 18M -S 0x1`
   * `-S 0x1` Mark the packets as ecn-enabled
