@@ -9,7 +9,7 @@
   # qosmode=0: IPTOS_LOWDELAY increase packet priority in queue, IPTOS_THROUGHPUT decrease
   # qosmode=1: Any IPv6 and IPv4 traffic is sorted into the normal
   # qosmode=2: L4S mode, only ECT(1) ip packets get into high priority
-  qosmode=0
+  qosmode=2
   # Mark non-ect(1) Traffic as enabled
   l4sEnabledPreMarking=false
   # Mark the first packets with special ect
