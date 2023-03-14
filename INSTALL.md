@@ -49,16 +49,15 @@ _drplay has to be run as root (`sudo -i`) or user with privileges for tc._
 Output e.g.:
 
 ```
-timestampMs sojournTimeMs loadKbits capacityKbits ecnCePercent dropped netflow
-1657796732546 0 0 20507 0 0 192.168.178.101:22-192.168.178.75:57994
-1657796734410 0 0 20853 0 0 192.168.178.101:22-192.168.178.75:57994
-1657796734436 0 200 20105 0 0 192.168.178.101:22-192.168.178.75:57994
-1657796734436 0 3100 20105 0 0 192.168.178.101:5201-192.168.178.75:5201
-1657796734456 0 1100 20386 0 0 192.168.178.101:5201-192.168.178.75:5201
-1657796734476 0 1100 20905 0 0 192.168.178.101:5201-192.168.178.75:5201
-1657796734496 0 1100 20201 0 0 192.168.178.101:5201-192.168.178.75:5201
-1657796734516 0 1100 20520 0 0 192.168.178.101:5201-192.168.178.75:5201
-1657796734536 0 1100 20416 0 0 192.168.178.101:5201-192.168.178.75:5201
+timestampMs sojournTimeMs loadKbits capacityKbits ecnCePercent dropped prio netflow
+1678808847209 0 100 13360 0 0 0 2 192.168.178.119:22-192.168.178.75:57442
+1678808848179 0 400 13360 0 0 0 2 192.168.178.119:40184-192.168.178.75:5201
+1678808848179 0 200 13650 0 0 0 2 192.168.178.119:22-192.168.178.75:57442
+1678808848179 0 0 13940 0 0 0 2 192.168.178.119:60970-192.168.178.75:5201
+1678808848229 0 13100 13940 0 0 0 2 192.168.178.119:60970-192.168.178.75:5201
+1678808848229 0 0 13940 0 0 0 2 192.168.178.119:40184-192.168.178.75:5201
+1678808848240 1 13100 13951 0 0 0 2 192.168.178.119:60970-192.168.178.75:5201
+...
 ```
 
 ### output measures
@@ -68,6 +67,7 @@ timestampMs sojournTimeMs loadKbits capacityKbits ecnCePercent dropped netflow
 - `capacityKbits`: Capacity set by the data rate pattern. (minimum is set in config)
 - `ecnCePercent` : Percentage of ip packets with ECN=CE in sample
 - `dropped`: Number of packets dropped in sample
+- `prio`: priority of the queue, in which the packet is sent: 1=high, 2=medium, 3=low
 - `srcIp`: source ip of ip packet
 - `dstIp`: destination ip of ip packet
 - `netflow`: srcIp:srcPort-dstIp:dstPort
@@ -180,6 +180,11 @@ The config file is located in `/etc/jens-cli/config.toml`.
   extralatency=20
   # Mark non-ect(1) Traffic as enabled
   l4sEnabledPreMarking=false
+  # set queue priority handling of packets: low, medium or high
+  # qosmode=0: IPTOS_LOWDELAY increase packet priority in queue, IPTOS_THROUGHPUT decrease
+  # qosmode=1: Any IPv6 and IPv4 traffic is sorted into the normal
+  # qosmode=2: L4S mode, only ECT(1) ip packets get into high priority
+  qosmode=2
   # Mark the first packets with special ect
   signalDrpStart=false
 

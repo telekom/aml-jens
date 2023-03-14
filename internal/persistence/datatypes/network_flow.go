@@ -52,7 +52,14 @@ func (s *DB_network_flow) Insert(stmt SQLStmt) error {
 	 	prio
 	)
 	VALUES ( $1, $2, $3, $4, $5, $6)
-	RETURNING flow_id;`, s.args_insert()...).Scan(&s.Flow_id)
+	RETURNING flow_id;`,
+		s.Session_id,
+		s.Source_ip,
+		s.Source_port,
+		s.Destination_ip,
+		s.Destination_port,
+		s.Prio,
+	).Scan(&s.Flow_id)
 }
 
 // Eyecutes a or multiple sqlstmt, that will make sure its sinked with db
@@ -62,7 +69,13 @@ func (s *DB_network_flow) Sync(stmt SQLStmt) error {
 	//DEBUG.Printf("Syncing Flow:%+v", s)
 	err := stmt.QueryRow(`SELECT flow_id FROM network_flow 
 	WHERE session_id=$1 AND source_ip=$2 AND source_port=$3 AND 
-	destination_ip=$4 AND destination_port=$5`, s.args_insert()...).Scan(&s.Flow_id)
+	destination_ip=$4 AND destination_port=$5`,
+		s.Session_id,
+		s.Source_ip,
+		s.Source_port,
+		s.Destination_ip,
+		s.Destination_port,
+	).Scan(&s.Flow_id)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			//Case not in db -> insert
@@ -70,17 +83,6 @@ func (s *DB_network_flow) Sync(stmt SQLStmt) error {
 		}
 	}
 	return err
-}
-
-func (s *DB_network_flow) args_insert() []any {
-	return []any{
-		s.Session_id,
-		s.Source_ip,
-		s.Source_port,
-		s.Destination_ip,
-		s.Destination_port,
-		s.Prio,
-	}
 }
 
 func (s *DB_network_flow) MeasureIdStr() string {
