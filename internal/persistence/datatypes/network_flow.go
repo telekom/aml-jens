@@ -35,6 +35,7 @@ type DB_network_flow struct {
 	Source_port      uint16
 	Destination_ip   string
 	Destination_port uint16
+	Prio             uint8
 	//Used for caching
 	measure_id_str string
 }
@@ -47,9 +48,10 @@ func (s *DB_network_flow) Insert(stmt SQLStmt) error {
 		source_ip,
 		source_port,
 		destination_ip,
-		destination_port
+		destination_port,
+	 	prio
 	)
-	VALUES ( $1, $2, $3, $4, $5)
+	VALUES ( $1, $2, $3, $4, $5, $6)
 	RETURNING flow_id;`, s.args_insert()...).Scan(&s.Flow_id)
 }
 
@@ -77,6 +79,7 @@ func (s *DB_network_flow) args_insert() []any {
 		s.Source_port,
 		s.Destination_ip,
 		s.Destination_port,
+		s.Prio,
 	}
 }
 
