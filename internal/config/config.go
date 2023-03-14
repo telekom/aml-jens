@@ -64,6 +64,7 @@ func (c *config) readFromFile() error {
 		Markfull:            viper.GetInt32("tccommands.markfull"),
 		Queuesizepackets:    viper.GetInt32("tccommands.queuesizepackets"),
 		ExtralatencyMs:      viper.GetInt32("tccommands.extralatency"),
+		Qosmode:             uint8(viper.GetInt("tccommands.qosmode")),
 		L4sEnablePreMarking: viper.GetBool("tccommands.l4sEnabledPreMarking"),
 		SignalDrpStart:      viper.GetBool("tccommands.signalDrpStart"),
 		//DRP
@@ -128,6 +129,7 @@ func (c *config) setToDefaults() {
 		Markfull:            14,
 		Queuesizepackets:    10000,
 		ExtralatencyMs:      0,
+		Qosmode:             0,
 		L4sEnablePreMarking: false,
 		SignalDrpStart:      false,
 		//DRP

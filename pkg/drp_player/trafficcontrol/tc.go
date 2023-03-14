@@ -47,6 +47,7 @@ type TrafficControlStartParams struct {
 	AddonLatency int
 	Markfree     int
 	Markfull     int
+	Qosmode      uint8
 }
 type NftStartParams struct {
 	L4sPremarking bool
@@ -69,6 +70,10 @@ func (p TrafficControlStartParams) validate() error {
 	if p.Markfull > 0xffff {
 		return errortypes.NewUserInputError("Markfull possibly corrupted")
 	}
+	if p.Qosmode < 0 || p.Qosmode > 2 {
+		return errortypes.NewUserInputError("valid values for qosmode are 0,1,2")
+	}
+
 	return nil
 }
 
@@ -88,6 +93,10 @@ func (p TrafficControlStartParams) asArgs() []string {
 	if p.Markfull > 0 {
 		args = append(args, "markfull", fmt.Sprintf("%dms", p.Markfull))
 	}
+	if p.Qosmode > 0 {
+		args = append(args, "qosmode", fmt.Sprintf("%d", p.Qosmode))
+	}
+
 	return args
 }
 

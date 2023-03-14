@@ -3,7 +3,7 @@ Version: TEMPLATE_VERSION
 Section: base
 Priority: optional
 Architecture: all
-Depends: iproute2 (>=5.10.0-4jens17), sch-jens-dkms (>=5.10.0-4jens17), iproute-janz
+Depends: iproute2 (>=5.10.0-4jens19), sch-jens-dkms (>=5.10.0-4jens19), iproute-janz
 Breaks: jens (<=900.0)
 Maintainer: Deutsche Telekom AG <edge-computing@telekom.de>
 Provides: drplay, drshow, drbenchmark
