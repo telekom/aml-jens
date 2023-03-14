@@ -161,6 +161,7 @@ func (s *DrpPlayer) initTC() error {
 		AddonLatency: int(s.session.ExtralatencyMs),
 		Markfree:     int(s.session.Markfree),
 		Markfull:     int(s.session.Markfull),
+		Qosmode:      s.session.Qosmode,
 	},
 		trafficcontrol.NftStartParams{
 			L4sPremarking: s.session.L4sEnablePreMarking,

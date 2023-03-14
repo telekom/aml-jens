@@ -39,6 +39,7 @@ type DB_session struct {
 	Markfull            int32
 	Queuesizepackets    int32
 	ExtralatencyMs      int32
+	Qosmode             uint8
 	L4sEnablePreMarking bool
 	Nomeasure           bool
 	WarmupTimeMs        int
@@ -65,8 +66,9 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 	markfree,
 	markfull,
 	extralatency,
+	qosmode,
 	l4sEnablePreMarking
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING session_id`,
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING session_id`,
 		s.getBenchmarkId(),
 		s.Name,
 		s.Time,
@@ -75,6 +77,7 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 		s.Markfree,
 		s.Markfull,
 		s.ExtralatencyMs,
+		s.Qosmode,
 		s.L4sEnablePreMarking).Scan(&s.Session_id)
 	return err
 }
