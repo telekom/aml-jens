@@ -85,6 +85,7 @@ func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 		Fk_flow_id:          s.net_flow.Flow_id,
 		Capacitykbits:       sampleCapacityKbits,
 		Net_flow_string:     s.net_flow.MeasureIdStr(),
+		Net_flow_prio:       s.net_flow.Prio,
 	}
 }
 

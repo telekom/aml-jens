@@ -91,8 +91,8 @@ func (record RecordArray) AsPacketMeasure(session_id int) (*PacketMeasure, error
 		//Non-ip packet - ignore!
 		return nil, nil
 	}
-	var prio uint8 = record[51] & 0b11000000
-
+	var prio uint8 = record[51] & 0b11000000 >> 6
+	record[51] = record[51] & 0b00111111
 	flow := datatypes.DB_network_flow{
 		Source_ip:        srcIp,
 		Source_port:      srcPort,
@@ -101,6 +101,7 @@ func (record RecordArray) AsPacketMeasure(session_id int) (*PacketMeasure, error
 		Session_id:       session_id,
 		Prio:             prio,
 	}
+
 	packetMeasure := PacketMeasure{
 		timestampMs:    record.timestamp(),
 		sojournTimeMs:  uint32(binary.LittleEndian.Uint32(record[12:16])) / 1e3,
