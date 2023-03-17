@@ -64,6 +64,6 @@ func (s *DB_measure_packet) CsvRecord() []string {
 
 //go:inline
 func (s *DB_measure_packet) PrintLine() error {
-	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, s.Dropped, s.Net_flow_prio, s.Net_flow_string)
+	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, s.Net_flow_prio, s.Net_flow_string)
 	return err
 }
