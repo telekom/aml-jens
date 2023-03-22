@@ -62,6 +62,11 @@ func (s *DB_network_flow) Insert(stmt SQLStmt) error {
 	).Scan(&s.Flow_id)
 }
 
+func (s *DB_network_flow) Update(stmt SQLStmt, flowId int, prio uint8) error {
+	_, err := stmt.Exec(`UPDATE network_flow SET prio = $1 WHERE flow_id = $2`, prio, flowId)
+	return err
+}
+
 // Eyecutes a or multiple sqlstmt, that will make sure its sinked with db
 //
 // In this case, it makes sure, that its not yet in db.
