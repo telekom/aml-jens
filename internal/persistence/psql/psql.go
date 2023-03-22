@@ -46,11 +46,11 @@ type DataBase struct {
 	txMqMutex              sync.Mutex
 	stmt_queue             *sql.Stmt
 	stmt_sessionstats      *sql.Stmt
-	knownFlowsByMeasure_ID map[string]int
+	knownFlowsByMeasure_ID map[string]*datatypes.DB_network_flow
 }
 
 func (s *DataBase) ClearCache() {
-	s.knownFlowsByMeasure_ID = make(map[string]int)
+	s.knownFlowsByMeasure_ID = make(map[string]*datatypes.DB_network_flow)
 }
 func (s *DataBase) GetStmt() datatypes.SQLStmt {
 	return s.db
@@ -68,7 +68,7 @@ func (s *DataBase) Close() error {
 	return nil
 }
 func (s *DataBase) Init(login *datatypes.Login) error {
-	s.knownFlowsByMeasure_ID = make(map[string]int)
+	s.knownFlowsByMeasure_ID = make(map[string]*datatypes.DB_network_flow)
 	if login != nil {
 		db, err := sql.Open("postgres", login.InfoStr())
 		if err != nil {
@@ -126,13 +126,17 @@ func (s *DataBase) GetSessionStats(session_id int) (int, int, int, error) {
 
 // var flow_id_cache map[string]
 func (s *DataBase) persist_flow(flow *datatypes.DB_network_flow) error {
-	id, keyExists := s.knownFlowsByMeasure_ID[flow.MeasureIdStr()]
+	flowInCache, keyExists := s.knownFlowsByMeasure_ID[flow.MeasureIdStr()]
 	if keyExists {
-		flow.Flow_id = id
+		if flow.Prio != flowInCache.Prio {
+			flow.Update(s.db, flowInCache.Flow_id, flow.Prio)
+			flowInCache.Prio = flow.Prio
+		}
+		flow.Flow_id = flowInCache.Flow_id
 		return nil
 	} else {
 		err := flow.Sync(s.db)
-		s.knownFlowsByMeasure_ID[flow.MeasureIdStr()] = flow.Flow_id
+		s.knownFlowsByMeasure_ID[flow.MeasureIdStr()] = flow
 		return err
 	}
 }
