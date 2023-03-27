@@ -45,6 +45,7 @@ const (
 	i_capacity
 	i_ecn
 	i_drop
+	i_prio
 	i_netw
 )
 const (
@@ -311,6 +312,7 @@ func (manager *FlowManager) ReadFromLine(line string) bool {
 	f := NewFlow(
 		net_data[in_src],
 		net_data[in_dst],
+		splitData[i_prio],
 	)
 	//manager.Mutex.Lock()
 	if !manager.Contains(f) {
