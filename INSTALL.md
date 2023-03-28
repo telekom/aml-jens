@@ -67,7 +67,7 @@ timestampMs sojournTimeMs loadKbits capacityKbits ecnCePercent dropped prio netf
 - `capacityKbits`: Capacity set by the data rate pattern. (minimum is set in config)
 - `ecnCePercent` : Percentage of ip packets with ECN=CE in sample
 - `dropped`: Number of packets dropped in sample
-- `prio`: priority of the queue, in which the packet is sent: 1=high, 2=medium, 3=low
+- `prio`: internal priority of the queue, in which the packet is sent: 1=high, 2=medium, 3=low
 - `srcIp`: source ip of ip packet
 - `dstIp`: destination ip of ip packet
 - `netflow`: srcIp:srcPort-dstIp:dstPort
