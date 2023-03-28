@@ -138,16 +138,16 @@ func (self *FlowT) FmtString() string {
 }
 
 func NewFlow(src string, dst string, prio string) *FlowT {
-	a, err := strconv.Atoi(prio)
+	p, err := strconv.Atoi(prio)
 	if err != nil {
-		a = 9
+		p = 9
 	}
 
 	return &FlowT{
 		Src:  *NewNetEndPointFromString(src),
 		Dst:  *NewNetEndPointFromString(dst),
 		D:    *NewFlowDataPoints(),
-		Prio: a}
+		Prio: p}
 }
 
 func (self *FlowT) Equals(other *FlowT) bool {
