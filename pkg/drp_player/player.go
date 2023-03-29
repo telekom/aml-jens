@@ -75,10 +75,10 @@ func (s *DrpPlayer) Start() error {
 				WARN.Printf("During DrPlay: %v", err.Err)
 			case util.ErrFatal:
 				FATAL.Printf("Something went wrong during DrPlay: %v", err.Err)
-				s.close_channel()
 				if s.is_shutting_down {
 					FATAL.Printf("^^ Above exception happend while DrPlay was already shutting down")
 				}
+				s.ExitNoWait()
 			default:
 				WARN.Printf("Unknown ErrLevel during Drplay: %+v", err)
 			}
