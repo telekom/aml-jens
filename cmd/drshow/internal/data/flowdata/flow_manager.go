@@ -306,7 +306,7 @@ func (manager *FlowManager) ReadFromLine(line string) bool {
 	}
 	net_data := strings.Split(splitData[i_netw], "-")
 	if len(net_data) != 2 {
-		INFO.Fatalf("Did not find correct flow format: %s", splitData[i_netw])
+		WARN.Printf("Did not find correct flow format: %s", splitData[i_netw])
 		return false
 	}
 	f := NewFlow(
