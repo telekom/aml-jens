@@ -38,6 +38,7 @@ type DB_benchmark struct {
 	Sessions      []*DB_session
 	PrintToStdOut bool
 	CsvOuptut     bool
+	Repetitions   int
 	Hash          string
 }
 

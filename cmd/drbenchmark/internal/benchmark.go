@@ -92,6 +92,7 @@ func (b *Benchmark) Play() (err error) {
 		playtime += v.ChildDRP.GetEstimatedPlaytime()
 		playtime += 2
 	}
+	playtime *= b.bm.Repetitions + (b.bm.Repetitions * 5)
 	err = (*db).Persist(b.bm)
 	if err != nil {
 		FATAL.Exit(err)
@@ -100,53 +101,34 @@ func (b *Benchmark) Play() (err error) {
 	fmt.Printf("┃  ┣╸Name:        %s\n", b.bm.Name)
 	fmt.Printf("┃  ┣╸Tag:         %s\n", b.bm.Tag)
 	fmt.Printf("┃  ┣╸Hash:        %s\n", b.bm.GetHashFromLoadedJson())
+	if b.bm.Repetitions > 1 {
+		fmt.Printf("┃  ┣╸Repetitions: %d\n", b.bm.Repetitions)
+	}
 	fmt.Printf("┃  ┣╸Esti. Time:  %ds\n", playtime)
 	fmt.Printf("┃  ┗╸BenchmarkID: %d\n", b.bm.Benchmark_id)
-	/*
-		fmt.Printf("┣╸Warmup: Estimating max bitrate (≈%ds)\n", summary.Definition.Inner.MaxBitrateEstimationTimeS)
-		if err = summary.Warmup(); err != nil {
-			return err
-		}
-		fmt.Printf("┃  ┗╸Max: %d kb\n", summary.maxBitrateInWarump)
-	*/
-	/*
-	 *    Start playing each session
-	 */
 	fmt.Println("┣╸Beginning with Sessions")
 	session_count := len(b.bm.Sessions)
 	for i, v := range b.bm.Sessions {
-		v.Time = uint64(time.Now().UnixMilli())
-		config.PlayCfg().A_Session = v
-		err := (*db).Persist(v)
-		if err != nil {
-			FATAL.Exit(err)
-		}
-		formatDropDownMessage(i, session_count, 1)
-		fmt.Printf("%s (≈%ds)", v.Name, v.ChildDRP.GetEstimatedPlaytime())
-
-		time.Sleep(2 * time.Second)
-		v.Time = uint64(time.Now().UnixMilli())
-		b.player = drplay.NewDrpPlayer(v)
-		err = b.player.Start()
-		if err != nil {
-			return err
-		}
-		b.player.Wait()
-		(*db).ClearCache()
-		_, start_t, end_t, err := (*db).GetSessionStats(v.Session_id)
-		if err != nil {
-			return err
-		}
-		if !b.was_skipped {
-			fmt.Println(" ✓")
-			formatDropDownMessage(1, 2, 2)
-			fmt.Printf(assets.URL_BASE_G_MONITORING+assets.URL_ARGS_G_MONITORING+"\n",
-				gw, v.Session_id, start_t, end_t)
-		} else {
-			fmt.Println(" ✖")
-			formatDropDownMessage(1, 2, 2)
-			fmt.Println("User Interrupt")
-			b.was_skipped = false
+		session_name_original := v.Name
+		for rep := 0; rep < b.bm.Repetitions; rep++ {
+			if b.bm.Repetitions > 1 {
+				v.Name = fmt.Sprintf("%s [rep%d/%d]", session_name_original, rep+1, b.bm.Repetitions)
+				v.ChildDRP.Reset()
+			}
+			b.pre_play_session(i, session_count, v)
+			err, res_session := b.play_session(db, *v)
+			if err != nil {
+				fmt.Println(" ✖")
+				formatDropDownMessage(1, 2, 2)
+				fmt.Println("Error while playing session")
+				WARN.Println(err)
+				continue
+			}
+			session_id := res_session.Session_id
+			b.post_play_session(db, gw, session_id)
+			if b.bm.Repetitions > 1 && b.was_skipped {
+				time.Sleep(5 * time.Second)
+			}
 		}
 
 	}
@@ -158,4 +140,46 @@ func (b *Benchmark) Play() (err error) {
 	fmt.Printf(assets.URL_BASE_G_OVERVIEW+assets.URL_ARGS_G_OVERVIEW+"\n",
 		gw, b.bm.Benchmark_id)
 	return (*db).Close()
+}
+func (b *Benchmark) pre_play_session(i int, session_count int, v *datatypes.DB_session) {
+	formatDropDownMessage(i, session_count, 1)
+	fmt.Printf("'%s' (≈%ds)", v.Name, v.ChildDRP.GetEstimatedPlaytime())
+}
+func (b *Benchmark) post_play_session(db *persistence.Persistence, gw string, session_id int) {
+	_, start_t, end_t, err := (*db).GetSessionStats(session_id)
+	if err != nil {
+		fmt.Println(" ✖")
+		formatDropDownMessage(1, 2, 2)
+		fmt.Println("Error while getting session stats")
+		WARN.Println(err)
+		return
+	}
+	if !b.was_skipped {
+		fmt.Println(" ✓")
+		formatDropDownMessage(1, 2, 2)
+		fmt.Printf(assets.URL_BASE_G_MONITORING+assets.URL_ARGS_G_MONITORING+"\n",
+			gw, session_id, start_t, end_t)
+	} else {
+		fmt.Println(" ✖")
+		formatDropDownMessage(1, 2, 2)
+		fmt.Println("User Interrupt")
+		b.was_skipped = false
+	}
+}
+func (b *Benchmark) play_session(db *persistence.Persistence, session_copy datatypes.DB_session) (error, *datatypes.DB_session) {
+	v := &session_copy
+	v.Time = uint64(time.Now().UnixMilli())
+	config.PlayCfg().A_Session = v
+	if err := (*db).Persist(v); err != nil {
+		return err, nil
+	}
+	v.Time = uint64(time.Now().UnixMilli())
+	b.player = drplay.NewDrpPlayer(v)
+	if err := b.player.Start(); err != nil {
+		return err, nil
+	}
+	b.player.Wait()
+	(*db).ClearCache()
+
+	return nil, v
 }
