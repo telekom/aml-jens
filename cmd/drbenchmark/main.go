@@ -49,6 +49,7 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	var dev string = ""
 	var benchmark string = ""
 	var tag string = ""
+	var repeatEach int = 1
 	version := flag.Bool("v", false, "prints build version")
 	flag.StringVar(&dev, "dev", "",
 		"nic to play data rate pattern on, default 'lo'")
@@ -56,6 +57,8 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 		"JSON file containing a benchmark definition")
 	flag.StringVar(&tag, "tag", "<interactive>",
 		"name for the benchmark in DB.\nConvention: <algorithm> - L4S: <true/false>")
+	flag.IntVar(&repeatEach, "repeat", repeatEach, "Int 1-999: Number of repetitions for each DRP in the benchmark")
+
 	flag.Parse()
 	if *version {
 		fmt.Printf("Version      : %s\n", assets.VERSION)
@@ -67,6 +70,9 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	}
 	if dev == "" {
 		logging.FlagParseExit("Flag: 'dev' was not set")
+	}
+	if repeatEach < 1 || repeatEach > 999 {
+		logging.FlagParseExit("Flag: 'repeat' was not in range [1,1000[")
 	}
 	var err error
 	if tag == "<interactive>" {
@@ -85,6 +91,7 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 		return nil, fmt.Errorf("Could not load Benchmark from json: %w", err)
 	}
 	res.Tag = tag
+	res.Repetitions = repeatEach
 	if _, err := net.InterfaceByName(dev); err != nil {
 		return nil, fmt.Errorf("'%s' is not a recognized interface -> %v", dev, err)
 	}
