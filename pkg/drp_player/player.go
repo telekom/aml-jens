@@ -92,6 +92,12 @@ func (s *DrpPlayer) Start() error {
 	if err := s.initTC(); err != nil {
 		return fmt.Errorf("initTC returned %w", err)
 	}
+	select {
+	case <-time.After(time.Millisecond * time.Duration(s.session.WarmupTimeMs)):
+		//asd
+	case <-s.r.On_extern_exit_c:
+		return nil
+	}
 
 	if !s.session.ChildDRP.Nomeasure {
 		ms := measuresession.NewMeasureSession(s.session, s.tc)

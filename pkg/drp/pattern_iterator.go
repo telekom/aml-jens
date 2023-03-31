@@ -45,8 +45,13 @@ func NewDataRatePatternIterator() *DataRatePatternIterator {
 // updates internal data pointer as well as position and value
 func (s *DataRatePatternIterator) updateAndReset(drp *[]float64) {
 	s.data = drp
+	s.Reset()
+}
+
+// Resets positon and value to start
+func (s *DataRatePatternIterator) Reset() {
 	s.position = -1
-	s.value = (*drp)[0]
+	s.value = (*s.data)[0]
 }
 
 // Retunrs last value
