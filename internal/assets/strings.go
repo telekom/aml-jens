@@ -27,8 +27,8 @@ const (
 )
 
 const (
-	URL_BASE_G_MONITORING = "http://%s:3000/d/5-K9sHm4k/l4s-monitoring"
-	URL_ARGS_G_MONITORING = "?orgId=1&var-session_id=%d&var-flow_id=All&var-src_port=All&var-dst_port=All&var-smoothing=0&from=%d&to=%d"
-	URL_BASE_G_OVERVIEW   = "http://%s:3000/d/n0rBGsWVz/session-overview"
-	URL_ARGS_G_OVERVIEW   = "?orgId=1&refresh=5s&var-benchmark_id=%d"
+	URL_BASE_G_MONITORING = "http://%s:3000/d/5-K9sHm4k"
+	URL_ARGS_G_MONITORING = "?orgId=1&var-session_id=%d&from=%d&to=%d"
+	URL_BASE_G_OVERVIEW   = "http://%s:3000/d/n0rBGsWVz"
+	URL_ARGS_G_OVERVIEW   = "?orgId=1&refresh=20s&var-benchmark_id=%d"
 )
