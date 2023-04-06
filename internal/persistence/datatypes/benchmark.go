@@ -25,8 +25,95 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/telekom/aml-jens/internal/commands"
 	"github.com/telekom/aml-jens/internal/util"
 )
+
+type benchmark_callback struct {
+	executable string
+	ret        chan error
+}
+
+type Benchmark_callback_id uint8
+
+const (
+	BM_CB_PreBenchmark  = 1
+	BM_CB_PreSession    = 4
+	BM_CB_PostSession   = 7
+	BM_CB_PostBenchmark = 9
+)
+
+var callback_name_lookup = []string{
+	/*0*/ "None",
+	/*1*/ "PreBenchmark",
+	/*2*/ "None",
+	/*3*/ "None",
+	/*4*/ "PreSession",
+	/*5*/ "None",
+	/*6*/ "None",
+	/*7*/ "PostSession",
+	/*8*/ "None",
+	/*9*/ "PostBenchmark",
+}
+
+// Create a new benchmark_callback.
+//
+// Check existence and executbale status of path
+func new_bm_cb(path string) (error, benchmark_callback) {
+	is_exec, err := util.IsFileAndExecutable(path)
+	if err != nil {
+		path = ""
+		err = fmt.Errorf("could not check status fo benchmark_callback %w", err)
+	} else if !is_exec {
+		path = ""
+		err = fmt.Errorf("file %s is not a file or not marked as executable", path)
+	}
+	return err, benchmark_callback{path, make(chan error)}
+}
+
+func (b benchmark_callback) exec(i Benchmark_callback_id, env []string, args ...string) (bool, <-chan error) {
+	if b.executable == "" {
+		return false, b.ret
+	}
+	go func() {
+		args = append(args, "DUMMY")
+		copy(args[1:], args)
+		args[0] = fmt.Sprint(i)
+		res := commands.ExecCommandEnv(b.executable, env, args...)
+		err := res.Error()
+		if err != nil {
+			err = fmt.Errorf("did not Successfully execute %s -> %w", callback_name_lookup[i], res.Error())
+		}
+		b.ret <- err
+	}()
+	return true, b.ret
+}
+func (b benchmark_callback) OnPreBenchmark(bench *DB_benchmark) (is_running bool, result <-chan error) {
+	env := []string{
+		fmt.Sprintf("Sessions=%d", len(bench.Sessions)),
+	}
+	return b.exec(BM_CB_PreBenchmark, env,
+		fmt.Sprint(bench.Benchmark_id), bench.Name, bench.Tag)
+}
+func (b benchmark_callback) OnPreSession(sess_num int) (is_running bool, result <-chan error) {
+	return b.exec(BM_CB_PreSession,
+		[]string{},
+		fmt.Sprint(sess_num),
+	)
+}
+func (b benchmark_callback) OnPostSession(success bool, session_id int, start_t int, end_t int) (is_running bool, result <-chan error) {
+	return b.exec(BM_CB_PostSession,
+		[]string{},
+		fmt.Sprint(map[bool]int8{false: 0, true: 1}[success]),
+		fmt.Sprint(session_id),
+		fmt.Sprint(start_t),
+		fmt.Sprint(end_t))
+}
+func (b benchmark_callback) OnPostBenchmark(id int) (is_running bool, result <-chan error) {
+	return b.exec(BM_CB_PostBenchmark,
+		[]string{},
+		fmt.Sprint(id))
+}
 
 type DB_benchmark struct {
 	//Name of benchamrk (in json)
@@ -38,8 +125,16 @@ type DB_benchmark struct {
 	Sessions      []*DB_session
 	PrintToStdOut bool
 	CsvOuptut     bool
-	Repetitions   int
 	Hash          string
+	//Not DB
+	Callback benchmark_callback
+}
+
+// Links external callbacks for benchmark.
+// should only be used by argparse
+func (s *DB_benchmark) LinkCallback(path string) (err error) {
+	err, s.Callback = new_bm_cb(path)
+	return err
 }
 
 func (s *DB_benchmark) GetHashFromLoadedJson() string {
