@@ -91,6 +91,7 @@ func (s *DrpPlayer) Start() error {
 	if err := s.initTC(); err != nil {
 		return fmt.Errorf("initTC returned %w", err)
 	}
+
 	s.tc.ChangeTo(s.session.ChildDRP.Peek() * 1.33)
 	select {
 	case <-time.After(time.Millisecond * time.Duration(s.session.ChildDRP.WarmupTimeMs)):
