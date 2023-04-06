@@ -37,3 +37,12 @@ func IsDirectory(path string) (bool, error) {
 
 	return fileInfo.IsDir(), nil
 }
+
+func IsFileAndExecutable(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+
+	return fileInfo.Mode().IsRegular() && fileInfo.Mode()&0111 != 0, nil
+}

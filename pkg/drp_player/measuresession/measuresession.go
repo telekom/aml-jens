@@ -151,8 +151,6 @@ const MM_FILE = "/sys/kernel/debug/sch_janz/0001:0"
 
 const SAMPLE_DURATION_MS = 10
 
-var bool2int = map[bool]int8{false: 0, true: 1}
-
 type MeasureSession struct {
 	session             *datatypes.DB_session
 	tc                  *trafficcontrol.TrafficControl
@@ -232,6 +230,11 @@ func (m *MeasureSession) poll(r util.RoutineReport) {
 	var file, err = os.Open(MM_FILE)
 	if err != nil {
 		r.ReportFatal(fmt.Errorf("measuresession.poll: %w", err))
+	}
+	/* Clear recordArray due to records in WarmupTime*/
+	if m.session.ChildDRP.WarmupTimeMs > 0 {
+		dummy := make([]byte, 0xffffffff)
+		file.Read(dummy)
 	}
 	defer func() {
 		DEBUG.Println("Closed: Poll")

@@ -56,7 +56,15 @@ func (s CommandResult) Error() error {
 // ExecReturnOutput executes 'name' with args
 // returns CommandResult.
 func ExecCommand(name string, arg ...string) CommandResult {
-	return execCmd(exec.Command(name, arg...))
+	return ExecCommandEnv(name, []string{}, arg...)
+}
+
+// ExecReturnOutput executes 'name' with args
+// returns CommandResult.
+func ExecCommandEnv(name string, env []string, arg ...string) CommandResult {
+	cmd := exec.Command(name, arg...)
+	cmd.Env = append(cmd.Env, env...)
+	return execCmd(cmd)
 
 }
 

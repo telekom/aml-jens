@@ -42,29 +42,6 @@ type Benchmark struct {
 	was_skipped bool
 }
 
-func formatDropDownMessage(i int, max int, indent int) {
-	p := ""
-	switch indent {
-	case 1:
-		p = "┃  "
-	case 2:
-		p = "┃  ┃  "
-	}
-
-	if i == 0 {
-		if max == 1 {
-			fmt.Print(p + "┗╸")
-		} else {
-			fmt.Print(p + "┣╸")
-		}
-	} else {
-		if i == max-1 {
-			fmt.Print(p + "┗╸")
-		} else {
-			fmt.Print(p + "┣╸")
-		}
-	}
-}
 func New(benchmark *datatypes.DB_benchmark) *Benchmark {
 	return &Benchmark{
 		player:      nil,
@@ -82,6 +59,7 @@ func (b *Benchmark) Play() (err error) {
 	/*
 	 *    Prep work
 	 */
+	w := util.NewIndentWirter()
 	db, err := persistence.GetPersistence()
 	if err != nil {
 		return err
@@ -90,81 +68,138 @@ func (b *Benchmark) Play() (err error) {
 	playtime := 0
 	for _, v := range b.bm.Sessions {
 		playtime += v.ChildDRP.GetEstimatedPlaytime()
-		playtime += 2
 	}
-	playtime *= b.bm.Repetitions + (b.bm.Repetitions * 5)
 	err = (*db).Persist(b.bm)
 	if err != nil {
 		FATAL.Exit(err)
 	}
-	fmt.Println("┏╸Starting the benchmark")
-	fmt.Printf("┃  ┣╸Name:        %s\n", b.bm.Name)
-	fmt.Printf("┃  ┣╸Tag:         %s\n", b.bm.Tag)
-	fmt.Printf("┃  ┣╸Hash:        %s\n", b.bm.GetHashFromLoadedJson())
-	if b.bm.Repetitions > 1 {
-		fmt.Printf("┃  ┣╸Repetitions: %d\n", b.bm.Repetitions)
+
+	w.WriteNoIndent("DRBENCHMARK\n")
+	w.Indent(true)
+	w.WriteNormalLines([]string{
+		fmt.Sprintf("Name:        %s\n", b.bm.Name),
+		fmt.Sprintf("Tag:         %s\n", b.bm.Tag),
+		fmt.Sprintf("Hash:        %s\n", b.bm.GetHashFromLoadedJson())})
+	w.WriteNormal(fmt.Sprintf(
+		"Esti. Time:  %ds\n", playtime))
+	w.WriteCloseIndent(fmt.Sprintf(
+		"BenchmarkID: %d\n", b.bm.Benchmark_id))
+	w.UnIndent()
+	w.WriteNormal(
+		"Beginning with Benchmarking\n")
+	w.Indent(true)
+	if is_running, ret := b.bm.Callback.OnPreBenchmark(b.bm); is_running {
+		w.Indent(true)
+		w.WriteCloseIndent("OnPreBenchmark")
+		if err := <-ret; err != nil {
+			WARN.Printf("OnPreBenchmark: %s", err)
+			w.WriteNoIndent(" ✖\n")
+			FATAL.Exit("OnPreBenchmark= something went wrong while calling the script\n")
+		}
+		w.WriteNoIndent(" ✓\n")
+		w.UnIndent()
 	}
-	fmt.Printf("┃  ┣╸Esti. Time:  %ds\n", playtime)
-	fmt.Printf("┃  ┗╸BenchmarkID: %d\n", b.bm.Benchmark_id)
-	fmt.Println("┣╸Beginning with Sessions")
 	session_count := len(b.bm.Sessions)
 	for i, v := range b.bm.Sessions {
-		session_name_original := v.Name
-		for rep := 0; rep < b.bm.Repetitions; rep++ {
-			if b.bm.Repetitions > 1 {
-				v.Name = fmt.Sprintf("%s [rep%d/%d]", session_name_original, rep+1, b.bm.Repetitions)
-				v.ChildDRP.Reset()
-			}
-			b.pre_play_session(i, session_count, v)
-			err, res_session := b.play_session(db, *v)
+		msg := fmt.Sprintf(
+			"'%s' (≈%ds)\n", v.Name, v.ChildDRP.GetEstimatedPlaytime())
+		if i != session_count-1 {
+			w.WriteCloseIndent(msg)
+		} else {
+			w.WriteNormal(msg)
+		}
+
+		is_running, result_c := b.bm.Callback.OnPreSession(i)
+		if is_running {
+
+			w.Indent(i != session_count-1)
+			w.WriteNormal("OnPreSession ")
+			err := <-result_c
 			if err != nil {
-				fmt.Println(" ✖")
-				formatDropDownMessage(1, 2, 2)
-				fmt.Println("Error while playing session")
+				w.WriteNoIndent(" ✖\n")
 				WARN.Println(err)
-				continue
-			}
-			session_id := res_session.Session_id
-			b.post_play_session(db, gw, session_id)
-			if b.bm.Repetitions > 1 && b.was_skipped {
-				time.Sleep(5 * time.Second)
+			} else {
+				w.WriteNoIndent(" ✓\n")
 			}
 		}
+		w.WriteNormal("DrPlay      ")
+		err, res_session := b.play_session(db, *v)
+		if err != nil {
+			w.WriteNoIndent(" ✖\n")
+			w.Indent(i != session_count-1)
+			w.WriteNormal("Error while playing session\n")
+			w.WriteCloseIndent(err.Error())
+			w.UnIndent()
+			WARN.Println(err)
+			continue
+		}
+		session_id := res_session.Session_id
+		b.post_play_session(w, db, gw, session_id)
 
 	}
 	/*
 	 *    Give combined Summary
 	 */
-	fmt.Println("┣╸Summarizing benchmark")
-	formatDropDownMessage(1, 2, 1)
-	fmt.Printf(assets.URL_BASE_G_OVERVIEW+assets.URL_ARGS_G_OVERVIEW+"\n",
-		gw, b.bm.Benchmark_id)
+	w.UnIndent()
+	w.WriteCloseIndent("Summarizing benchmark\n")
+	w.Indent(false)
+	w.WriteNormal("OnPostBenchmark")
+	if !b.was_skipped {
+		if is_running, ret := b.bm.Callback.OnPostBenchmark(b.bm.Benchmark_id); is_running {
+			if err := <-ret; err != nil {
+				w.WriteNoIndent(" ✖\n")
+				w.Indent(false)
+				w.WriteCloseIndent(err.Error())
+				WARN.Printf("OnPostBenchmark: %s\n", err)
+			} else {
+				w.WriteNoIndent(" ✓\n")
+			}
+		}
+	}
+
+	w.WriteCloseIndent(fmt.Sprintf(
+		assets.URL_BASE_G_OVERVIEW+assets.URL_ARGS_G_OVERVIEW+"\n",
+		gw, b.bm.Benchmark_id))
+	w.UnIndent()
 	return (*db).Close()
 }
-func (b *Benchmark) pre_play_session(i int, session_count int, v *datatypes.DB_session) {
-	formatDropDownMessage(i, session_count, 1)
-	fmt.Printf("'%s' (≈%ds)", v.Name, v.ChildDRP.GetEstimatedPlaytime())
-}
-func (b *Benchmark) post_play_session(db *persistence.Persistence, gw string, session_id int) {
+func (b *Benchmark) post_play_session(w *util.IndentedWriter, db *persistence.Persistence, gw string, session_id int) {
 	_, start_t, end_t, err := (*db).GetSessionStats(session_id)
 	if err != nil {
-		fmt.Println(" ✖")
-		formatDropDownMessage(1, 2, 2)
-		fmt.Println("Error while getting session stats")
+		w.WriteNoIndent(" ✖\n")
+		w.Indent(false)
+		w.WriteCloseIndent("Error while getting session stats\n")
+		w.UnIndent()
 		WARN.Println(err)
 		return
 	}
+
 	if !b.was_skipped {
 		fmt.Println(" ✓")
-		formatDropDownMessage(1, 2, 2)
-		fmt.Printf(assets.URL_BASE_G_MONITORING+assets.URL_ARGS_G_MONITORING+"\n",
-			gw, session_id, start_t, end_t)
+
+		if is_running, ret := b.bm.Callback.OnPostSession(true, session_id, start_t, end_t); is_running {
+
+			w.WriteNormal("OnPostSession")
+			if err := <-ret; err != nil {
+				w.WriteNoIndent(" ✖\n")
+				WARN.Println(err)
+			} else {
+				w.WriteNoIndent(" ✓\n")
+			}
+
+		}
+		w.WriteCloseIndent(fmt.Sprintf(
+			assets.URL_BASE_G_MONITORING+assets.URL_ARGS_G_MONITORING+"\n",
+			gw, session_id, start_t, end_t))
+		w.UnIndent()
 	} else {
-		fmt.Println(" ✖")
-		formatDropDownMessage(1, 2, 2)
-		fmt.Println("User Interrupt")
+		w.WriteNoIndent(" ✖\n")
+		w.Indent(false)
+		w.WriteCloseIndent("User Interrupt\n")
+		w.UnIndent()
 		b.was_skipped = false
 	}
+
 }
 func (b *Benchmark) play_session(db *persistence.Persistence, session_copy datatypes.DB_session) (error, *datatypes.DB_session) {
 	v := &session_copy

@@ -42,7 +42,6 @@ type DB_session struct {
 	Qosmode             uint8
 	L4sEnablePreMarking bool
 	Nomeasure           bool
-	WarmupTimeMs        int
 	//Non DB
 	SignalDrpStart bool
 	// DB_Relations
