@@ -155,7 +155,7 @@ func (s *DataBase) Persist(obj interface{}) error {
 		}
 		return nil
 	case persistence.DumbPersistable:
-		//Catch for benchmark, data_rate_pattern, session
+		//Catch for benchmark, data_rate_pattern
 		DEBUG.Printf("{interface {persistence.DumbPersistable}} --> %v", reflect.TypeOf(v))
 		return v.Insert(s.db)
 	default:

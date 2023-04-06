@@ -50,6 +50,7 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	var benchmark string = ""
 	var tag string = ""
 	var callback_path string = ""
+
 	version := flag.Bool("v", false, "prints build version")
 	flag.StringVar(&dev, "dev", "",
 		"nic to play data rate pattern on, default 'lo'")
@@ -91,6 +92,7 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	if err := res.LinkCallback(callback_path); err != nil {
 		return nil, err
 	}
+
 	if _, err := net.InterfaceByName(dev); err != nil {
 		return nil, fmt.Errorf("'%s' is not a recognized interface -> %v", dev, err)
 	}
