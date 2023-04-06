@@ -31,7 +31,7 @@ import (
 
 func TestNewBenchmarkPattern(t *testing.T) {
 	PATH := filepath.Join(paths.TESTDATA_DRP(), "drp_3valleys.csv")
-	data := jsonp.NewBenchmarkPattern(PATH, jsonp.NewDrplaySetting(100, 1.0, 500))
+	data := jsonp.NewBenchmarkPattern(PATH, jsonp.NewDrplaySetting(100, 1.0, 500, 999))
 	if err := data.Validate(); err != nil {
 		t.Fatalf("Validation failed: %s", err)
 	}

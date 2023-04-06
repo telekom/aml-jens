@@ -30,7 +30,7 @@ import (
 )
 
 func TestNewBenchmarkDrPlaySetting(t *testing.T) {
-	data := jsonp.NewDrplaySetting(1, 0.1, 100)
+	data := jsonp.NewDrplaySetting(1, 0.1, 100, 12000)
 	if *data.DRP.Frequency != 1 {
 		t.Fatalf("Frequency was not set in constructor")
 	}
@@ -40,9 +40,12 @@ func TestNewBenchmarkDrPlaySetting(t *testing.T) {
 	if *data.DRP.MinRateKbits != 100 {
 		t.Fatalf("MinRateKbits was not set in constructor")
 	}
+	if *data.DRP.WarmupBeforeDrpMs != 12000 {
+		t.Fatalf("WarmupBeforeDrpMs was not set in constructor")
+	}
 }
 func TestBenchmarkDrPlaySettingJsonMarshall(t *testing.T) {
-	data := jsonp.NewDrplaySetting(1, 0.1, 100)
+	data := jsonp.NewDrplaySetting(1, 0.1, 100, 12000)
 	txtbin, err := json.Marshal(data)
 	if err != nil {
 		t.Fatal(err)
@@ -51,4 +54,5 @@ func TestBenchmarkDrPlaySettingJsonMarshall(t *testing.T) {
 	utiltest.InJsonOutput(t, txt, "MinRateKbits")
 	utiltest.InJsonOutput(t, txt, "Scale")
 	utiltest.InJsonOutput(t, txt, "Frequency")
+	utiltest.InJsonOutput(t, txt, "WarmupBeforeDrpMs")
 }
