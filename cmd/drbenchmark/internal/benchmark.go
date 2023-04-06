@@ -73,7 +73,6 @@ func (b *Benchmark) Play() (err error) {
 	if err != nil {
 		FATAL.Exit(err)
 	}
-
 	w.WriteNoIndent("DRBENCHMARK\n")
 	w.Indent(true)
 	w.WriteNormalLines([]string{
@@ -121,6 +120,7 @@ func (b *Benchmark) Play() (err error) {
 			} else {
 				w.WriteNoIndent(" ✓\n")
 			}
+
 		}
 		w.WriteNormal("DrPlay      ")
 		err, res_session := b.play_session(db, *v)
@@ -163,6 +163,7 @@ func (b *Benchmark) Play() (err error) {
 	w.UnIndent()
 	return (*db).Close()
 }
+
 func (b *Benchmark) post_play_session(w *util.IndentedWriter, db *persistence.Persistence, gw string, session_id int) {
 	_, start_t, end_t, err := (*db).GetSessionStats(session_id)
 	if err != nil {

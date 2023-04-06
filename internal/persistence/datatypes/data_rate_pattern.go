@@ -52,13 +52,6 @@ func (s *DB_data_rate_pattern) GetName() string {
 	return s.dr_pattern.Name
 }
 
-// Reset ids set by Persistence
-//
-//go:inline
-func (s *DB_data_rate_pattern) Reset() {
-	s.dr_pattern.Iterator().Reset()
-}
-
 // Return the description of the loaded pattern; most likely empty
 //
 // The description is any comment in a dpr.csv that is not in the :key=value format
