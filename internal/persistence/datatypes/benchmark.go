@@ -60,13 +60,16 @@ var callback_name_lookup = []string{
 //
 // Check existence and executbale status of path
 func new_bm_cb(path string) (error, benchmark_callback) {
-	is_exec, err := util.IsFileAndExecutable(path)
-	if err != nil {
-		path = ""
-		err = fmt.Errorf("could not check status fo benchmark_callback %w", err)
-	} else if !is_exec {
-		path = ""
-		err = fmt.Errorf("file %s is not a file or not marked as executable", path)
+	var err error
+	if path != "" {
+		is_exec, err := util.IsFileAndExecutable(path)
+		if err != nil {
+			path = ""
+			err = fmt.Errorf("could not check status fo benchmark_callback %w", err)
+		} else if !is_exec {
+			path = ""
+			err = fmt.Errorf("file %s is not a file or not marked as executable", path)
+		}
 	}
 	return err, benchmark_callback{path, make(chan error)}
 }
