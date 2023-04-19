@@ -128,13 +128,13 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	if err := params.validate(); err != nil {
 		return err
 	}
-	if err := tc.Reset(); err != nil {
-		DEBUG.Printf("TcStart>TcReset: %v", err)
+	if err := tc.Reset(); true {
+		DEBUG.Printf("TcReset: %v", err)
 	}
 	args := []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "janz"}
 
 	args = append(args, params.asArgs()...)
-
+	time.Sleep(250 * time.Millisecond)
 	DEBUG.Printf("Starting tc: %+v", args)
 	res := commands.ExecCommand("tc", args...)
 	if res.Error() != nil {
