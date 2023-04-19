@@ -84,8 +84,7 @@ func (b *Benchmark) Play() (err error) {
 	w.WriteCloseIndent(fmt.Sprintf(
 		"BenchmarkID: %d\n", b.bm.Benchmark_id))
 	w.UnIndent()
-	w.WriteNormal(
-		"Beginning with Benchmarking\n")
+	w.WriteNormal("Beginning with Benchmarking\n")
 	w.Indent(true)
 	if is_running, ret := b.bm.Callback.OnPreBenchmark(b.bm); is_running {
 		w.Indent(true)
@@ -103,15 +102,13 @@ func (b *Benchmark) Play() (err error) {
 		msg := fmt.Sprintf(
 			"'%s' (≈%ds)\n", v.Name, v.ChildDRP.GetEstimatedPlaytime())
 		if i != session_count-1 {
-			w.WriteCloseIndent(msg)
-		} else {
 			w.WriteNormal(msg)
+		} else {
+			w.WriteCloseIndent(msg)
 		}
-
+		w.Indent(i != session_count-1)
 		is_running, result_c := b.bm.Callback.OnPreSession(i)
 		if is_running {
-
-			w.Indent(i != session_count-1)
 			w.WriteNormal("OnPreSession ")
 			err := <-result_c
 			if err != nil {
@@ -135,7 +132,6 @@ func (b *Benchmark) Play() (err error) {
 		}
 		session_id := res_session.Session_id
 		b.post_play_session(w, db, gw, session_id)
-
 	}
 	/*
 	 *    Give combined Summary
@@ -143,9 +139,9 @@ func (b *Benchmark) Play() (err error) {
 	w.UnIndent()
 	w.WriteCloseIndent("Summarizing benchmark\n")
 	w.Indent(false)
-	w.WriteNormal("OnPostBenchmark")
 	if !b.was_skipped {
 		if is_running, ret := b.bm.Callback.OnPostBenchmark(b.bm.Benchmark_id); is_running {
+			w.WriteNormal("OnPostBenchmark")
 			if err := <-ret; err != nil {
 				w.WriteNoIndent(" ✖\n")
 				w.Indent(false)
@@ -193,6 +189,7 @@ func (b *Benchmark) post_play_session(w *util.IndentedWriter, db *persistence.Pe
 			assets.URL_BASE_G_MONITORING+assets.URL_ARGS_G_MONITORING+"\n",
 			gw, session_id, start_t, end_t))
 		w.UnIndent()
+		time.Sleep(250 * time.Millisecond)
 	} else {
 		w.WriteNoIndent(" ✖\n")
 		w.Indent(false)
