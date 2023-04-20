@@ -134,7 +134,7 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	args := []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "janz"}
 
 	args = append(args, params.asArgs()...)
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 	DEBUG.Printf("Starting tc: %+v", args)
 	res := commands.ExecCommand("tc", args...)
 	if res.Error() != nil {
