@@ -18,7 +18,7 @@
 [postgres]
   dbname = "l4s_measure"
   host = "localhost"
-  password = "changeDefaultPassword"
+  password = "aml_jens-cli_pw!"
   port = 5432
   user = "edge"
 
