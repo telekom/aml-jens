@@ -59,13 +59,15 @@ type AggregateMeasure struct {
 	sampleCount      uint32
 	sumSojournTimeMs uint32
 	sumloadBytes     uint32
-	sumCapacityKbits float64
+	sumCapacityKbits int64
 	sumEcnNCE        uint32
 	sumDropped       uint32
 	net_flow         *datatypes.DB_network_flow
 	t_start          uint64
 	t_end            uint64
 }
+
+var currentCapacityKbits uint64
 
 func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 	var sampleCapacityKbits uint32
@@ -102,7 +104,7 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 	}
 }
 
-func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
+func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	if s.t_start == 0 {
 		s.t_start = pm.timestampMs
 	}
@@ -122,7 +124,7 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity float64) {
 		//s.sumCapacityKbits += float64(pm.packetSizeByte)
 
 	} else {
-		s.sumCapacityKbits += capacity
+		s.sumCapacityKbits += int64(capacity)
 	}
 
 	if pm.ecnOut == 3 {
@@ -280,11 +282,13 @@ func (m *MeasureSession) poll(r util.RoutineReport) {
 		case RECORD_TYPE_Q: // QueueMeasure MQ
 			numberOfPacketsInQueue := uint16(binary.LittleEndian.Uint16(recordArray[10:12]))
 			memUsageBytes := uint32(binary.LittleEndian.Uint32(recordArray[12:16]))
+			currentCapacityKbits = uint64(binary.LittleEndian.Uint64(recordArray[16:24])) / 1000
 			currentEpochMs := timestampMs + m.time_diff
 			queueMeasure := DB_measure_queue{
 				Time:              currentEpochMs,
 				Memoryusagebytes:  memUsageBytes,
 				PacketsInQueue:    numberOfPacketsInQueue,
+				CapacityKbits:     currentCapacityKbits,
 				Fk_session_tag_id: m.session.Session_id,
 			}
 			if !m.should_end {
@@ -345,14 +349,14 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 					mapMeasures[message.net_flow.MeasureIdStr()] = measure
 				}
 
-				measure.add(&message, m.tc.CurrentRate())
+				measure.add(&message, currentCapacityKbits)
 
 			default:
 				readMessages = false
 			}
 		}
 		if doExit {
-			DEBUG.Println("Retruning from aggregation")
+			DEBUG.Println("Returning from aggregation")
 			return
 		}
 		for _, aggregated_measure := range mapMeasures {
