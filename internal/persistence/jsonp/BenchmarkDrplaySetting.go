@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -39,12 +39,13 @@ func (bdrp *DrplaySetting) Validate() error {
 	}
 	return nil
 }
-func NewDrplaySetting(freq int, scale float64, minrate float64) DrplaySetting {
+func NewDrplaySetting(freq int, scale float64, minrate float64, warmupMs float64) DrplaySetting {
 	return DrplaySetting{
 		TC: nil,
 		DRP: &DrPlayDataRateConfig{
-			Frequency:    &freq,
-			Scale:        &scale,
-			MinRateKbits: &minrate,
+			Frequency:         &freq,
+			Scale:             &scale,
+			MinRateKbits:      &minrate,
+			WarmupBeforeDrpMs: &warmupMs,
 		}}
 }

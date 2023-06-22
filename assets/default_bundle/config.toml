@@ -5,6 +5,11 @@
   queuesizepackets=10000
   # AddonLatency in MS to add to all packets
   extralatency=0
+  # set queue priority handling of packets: low, medium or high
+  # qosmode=0: IPTOS_LOWDELAY increase packet priority in queue, IPTOS_THROUGHPUT decrease
+  # qosmode=1: Any IPv6 and IPv4 traffic is sorted into the normal
+  # qosmode=2: L4S mode, only ECT(1) ip packets get into high priority
+  qosmode=2
   # Mark non-ect(1) Traffic as enabled
   l4sEnabledPreMarking=false
   # Mark the first packets with special ect
@@ -13,7 +18,7 @@
 [postgres]
   dbname = "l4s_measure"
   host = "localhost"
-  password = "changeDefaultPassword"
+  password = "aml_jens-cli_pw!"
   port = 5432
   user = "edge"
 

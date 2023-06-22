@@ -42,7 +42,7 @@ const (
 // Heading for stdout of drplay --> stdin for drshow.pipe
 //
 // [timestamp, soj, load, ...]
-var CONST_HEADING = []string{"timestampMs", "sojournTimeMs", "loadKbits", "capacityKbits", "ecnCePercent", "dropped", "netflow"}
+var CONST_HEADING = []string{"timestampMs", "sojournTimeMs", "loadKbits", "capacityKbits", "ecnCePercent", "dropped", "prio", "netflow"}
 
 var END_OF_DRPLAY = [...]string{"data", "rate", "player", "ended"}
 
@@ -54,7 +54,7 @@ const (
 )
 
 /*
-	The following are set using ldbuild flags
+The following are set using ldbuild flags
 */
 var VERSION string = "NaN"
 var BUILD_TIME string = "0"

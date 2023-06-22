@@ -45,6 +45,7 @@ const (
 	i_capacity
 	i_ecn
 	i_drop
+	i_prio
 	i_netw
 )
 const (
@@ -305,12 +306,13 @@ func (manager *FlowManager) ReadFromLine(line string) bool {
 	}
 	net_data := strings.Split(splitData[i_netw], "-")
 	if len(net_data) != 2 {
-		INFO.Fatalf("Did not find correct flow format: %s", splitData[i_netw])
+		WARN.Printf("Did not find correct flow format: %s", splitData[i_netw])
 		return false
 	}
 	f := NewFlow(
 		net_data[in_src],
 		net_data[in_dst],
+		splitData[i_prio],
 	)
 	//manager.Mutex.Lock()
 	if !manager.Contains(f) {
