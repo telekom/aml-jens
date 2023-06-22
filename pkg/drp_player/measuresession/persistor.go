@@ -115,7 +115,12 @@ func (s *MeasureSessionPersistor) persist(sample interface{}) error {
 	}
 	if measure_packet, ok := sample.(DB_measure_packet); ok && s.session.ParentBenchmark.PrintToStdOut {
 		if err := measure_packet.PrintLine(); err != nil {
-			return fmt.Errorf("could not write Measurement: %w", err)
+			if strings.HasSuffix(err.Error(), "broken pipe") {
+				WARN.Printf("could not write Measurement: %s", err)
+				WARN.Printf("Setting printToStdOut to false")
+				s.session.ParentBenchmark.PrintToStdOut = false
+			}
+			return nil
 		}
 	}
 	if s.csv == nil {

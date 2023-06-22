@@ -1,5 +1,5 @@
 TEST_DATA_DIR="./test/testdata"
-VERSION ?= "-dev-00.00-99"
+VERSION ?= "99-dev-00.00-99"
 LD_FLAGS = "-X 'github.com/telekom/aml-jens/internal/assets.VERSION=$(VERSION)' -X 'github.com/telekom/aml-jens/internal/assets.BUILD_TIME=$(shell date --iso-8601=seconds)'"
 .PHONY: clean-binaries clean-packages test package help build-binaries coverage
 all: help
