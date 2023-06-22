@@ -4,9 +4,9 @@
  * (C) 2023 Deutsche Telekom AG
  *
  * Deutsche Telekom AG and all other contributors /
- * copyright owners license this file to you under the Apache 
- * License, Version 2.0 (the "License"); you may not use this 
- * file except in compliance with the License. 
+ * copyright owners license this file to you under the Apache
+ * License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
@@ -29,6 +29,7 @@ type DB_measure_queue struct {
 	Time              uint64
 	Memoryusagebytes  uint32
 	PacketsInQueue    uint16
+	CapacityKbits     uint64
 	Fk_session_tag_id int
 }
 

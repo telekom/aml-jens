@@ -145,11 +145,6 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	return err
 }
 
-// Returns the currently set data_rate
-func (tc *TrafficControl) CurrentRate() float64 {
-	return tc.current_data_rate
-}
-
 // Rests Qdisc to default
 func (tc *TrafficControl) Reset() error {
 	return commands.ExecCommand("tc", "qdisc", "delete", "dev", tc.dev, "root").Error()
