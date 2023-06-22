@@ -49,6 +49,8 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 	var dev string = ""
 	var benchmark string = ""
 	var tag string = ""
+	var callback_path string = ""
+
 	version := flag.Bool("v", false, "prints build version")
 	flag.StringVar(&dev, "dev", "",
 		"nic to play data rate pattern on, default 'lo'")
@@ -56,6 +58,8 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 		"JSON file containing a benchmark definition")
 	flag.StringVar(&tag, "tag", "<interactive>",
 		"name for the benchmark in DB.\nConvention: <algorithm> - L4S: <true/false>")
+	flag.StringVar(&callback_path, "callback", callback_path, "(Absolute) path to a executable/ shellscript that will be called on Pre(Benchmark/Session) & Post(Benchmark/Session)")
+
 	flag.Parse()
 	if *version {
 		fmt.Printf("Version      : %s\n", assets.VERSION)
@@ -85,6 +89,10 @@ func ArgParse() (*datatypes.DB_benchmark, error) {
 		return nil, fmt.Errorf("Could not load Benchmark from json: %w", err)
 	}
 	res.Tag = tag
+	if err := res.LinkCallback(callback_path); err != nil {
+		return nil, err
+	}
+
 	if _, err := net.InterfaceByName(dev); err != nil {
 		return nil, fmt.Errorf("'%s' is not a recognized interface -> %v", dev, err)
 	}

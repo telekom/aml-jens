@@ -20,7 +20,7 @@ _drbenchmark()
     local IFS=$'\t\n'
     _init_completion -n = || return
 
-    opts="-dev$IFS-benchmark$IFS-tag"
+    opts="-dev$IFS-benchmark$IFS-tag$IFS-callback"
     # Remove already used opts
     blacklist=()
     options=($opts)
@@ -28,6 +28,9 @@ _drbenchmark()
         case $item in 
         -dev)
             blacklist+=(-dev)
+        ;;
+        -callback)
+            blacklist+=(-callback)
         ;;
         -benchmark)
             blacklist+=(-benchmark)
@@ -56,6 +59,10 @@ _drbenchmark()
     ;;
     -benchmark)
 	    COMPREPLY=( $(compgen -f -X '!*.json' -S ' ' -- ${cur}) )
+        COMPREPLY+=( $(compgen -d -S '/' -- ${cur}) )
+    ;;
+    -callback)
+	    COMPREPLY=( $(compgen -f -X '!*.sh' -S ' ' -- ${cur}) )
         COMPREPLY+=( $(compgen -d -S '/' -- ${cur}) )
     ;;
     *)

@@ -61,7 +61,7 @@ func TestBenchmarkDefinitionWrapperJsonMarshall(t *testing.T) {
 func TestBenchmarkDefinitionWrapperJsonUnMarshall(t *testing.T) {
 	tc := jsonp.NewDrPlayTrafficControlConfig(1, 2, 12, false, false)
 	drp := jsonp.NewDrPlayDataRateConfig(10, 10, 1, 100)
-	drplayset := jsonp.NewDrplaySetting(100, 1.0, 500)
+	drplayset := jsonp.NewDrplaySetting(100, 1.0, 500, 11000)
 	drplayset.TC = &tc
 	payload, err := jsonp.NewBenchmarkDefinitionWrapper(
 		jsonp.BenchmarkDefinition{

@@ -69,6 +69,7 @@ type FlowT struct {
 	Src    NetEndPoint
 	Dst    NetEndPoint
 	FlowId int32 //Relic of the past. used for id-ing. set by manager!
+	Prio   int
 }
 
 func (s *FlowT) Color() uint8 {
@@ -117,6 +118,7 @@ func (self *FlowT) ExportToFile(path string) error {
 		line[i_ecn] = fmt.Sprint(int64((*self.D.Ecn)[i]))
 		line[i_load] = fmt.Sprint(int64((*self.D.Load)[i]))
 		line[i_sojourntime] = fmt.Sprint(int64((*self.D.Sojourn)[i]))
+		line[i_prio] = fmt.Sprint(self.Prio)
 		if err = csvWriter.Write(line); err != nil {
 			return err
 		}
@@ -135,12 +137,17 @@ func (self *FlowT) FmtString() string {
 	)
 }
 
-func NewFlow(src string, dst string) *FlowT {
-	return &FlowT{
-		Src: *NewNetEndPointFromString(src),
-		Dst: *NewNetEndPointFromString(dst),
-		D:   *NewFlowDataPoints(),
+func NewFlow(src string, dst string, prio string) *FlowT {
+	p, err := strconv.Atoi(prio)
+	if err != nil {
+		p = 9
 	}
+
+	return &FlowT{
+		Src:  *NewNetEndPointFromString(src),
+		Dst:  *NewNetEndPointFromString(dst),
+		D:    *NewFlowDataPoints(),
+		Prio: p}
 }
 
 func (self *FlowT) Equals(other *FlowT) bool {

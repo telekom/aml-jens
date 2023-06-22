@@ -41,14 +41,15 @@ func (r RecordArray) timestamp() uint64 {
 // Possible Returns:
 //   - nil, err               -> in event of actual error
 //   - &DB_measure_queue, nil -> everything OK
-func (record RecordArray) AsDB_measure_queue(diffTimeMs uint64, session_id int) (*DB_measure_queue, error) {
+func (record RecordArray) AsDB_measure_queue(session_id int) (*DB_measure_queue, error) {
 	if record.type_id() != RECORD_TYPE_Q {
 		return nil, fmt.Errorf("Cant Parse recordarray %v as DB_measure_queue: invalid type", record)
 	}
 	return &DB_measure_queue{
-		Time:              record.timestamp() + diffTimeMs,
+		Time:              record.timestamp(),
 		Memoryusagebytes:  uint32(binary.LittleEndian.Uint32(record[12:16])),
 		PacketsInQueue:    uint16(binary.LittleEndian.Uint16(record[10:12])),
+		CapacityKbits:     uint64(binary.LittleEndian.Uint64(record[16:24])) / 1000,
 		Fk_session_tag_id: session_id,
 	}, nil
 }
@@ -91,13 +92,17 @@ func (record RecordArray) AsPacketMeasure(session_id int) (*PacketMeasure, error
 		//Non-ip packet - ignore!
 		return nil, nil
 	}
+	var prio uint8 = record[51] & 0b11000000 >> 6
+	record[51] = record[51] & 0b00111111
 	flow := datatypes.DB_network_flow{
 		Source_ip:        srcIp,
 		Source_port:      srcPort,
 		Destination_ip:   dstIp,
 		Destination_port: dstPort,
 		Session_id:       session_id,
+		Prio:             prio,
 	}
+
 	packetMeasure := PacketMeasure{
 		timestampMs:    record.timestamp(),
 		sojournTimeMs:  uint32(binary.LittleEndian.Uint32(record[12:16])) / 1e3,

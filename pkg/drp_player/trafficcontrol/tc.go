@@ -47,6 +47,7 @@ type TrafficControlStartParams struct {
 	AddonLatency int
 	Markfree     int
 	Markfull     int
+	Qosmode      uint8
 }
 type NftStartParams struct {
 	L4sPremarking bool
@@ -69,6 +70,10 @@ func (p TrafficControlStartParams) validate() error {
 	if p.Markfull > 0xffff {
 		return errortypes.NewUserInputError("Markfull possibly corrupted")
 	}
+	if p.Qosmode < 0 || p.Qosmode > 2 {
+		return errortypes.NewUserInputError("valid values for qosmode are 0,1,2")
+	}
+
 	return nil
 }
 
@@ -88,6 +93,10 @@ func (p TrafficControlStartParams) asArgs() []string {
 	if p.Markfull > 0 {
 		args = append(args, "markfull", fmt.Sprintf("%dms", p.Markfull))
 	}
+	if p.Qosmode > 0 {
+		args = append(args, "qosmode", fmt.Sprintf("%d", p.Qosmode))
+	}
+
 	return args
 }
 
@@ -119,13 +128,13 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	if err := params.validate(); err != nil {
 		return err
 	}
-	if err := tc.Reset(); err != nil {
-		DEBUG.Printf("TcStart>TcReset: %v", err)
+	if err := tc.Reset(); true {
+		DEBUG.Printf("TcReset: %v", err)
 	}
 	args := []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "janz"}
 
 	args = append(args, params.asArgs()...)
-
+	time.Sleep(1 * time.Second)
 	DEBUG.Printf("Starting tc: %+v", args)
 	res := commands.ExecCommand("tc", args...)
 	if res.Error() != nil {
@@ -134,11 +143,6 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	var err error
 	tc.control_file, err = os.OpenFile(CTRL_FILE, os.O_WRONLY, os.ModeAppend)
 	return err
-}
-
-// Returns the currently set data_rate
-func (tc *TrafficControl) CurrentRate() float64 {
-	return tc.current_data_rate
 }
 
 // Rests Qdisc to default

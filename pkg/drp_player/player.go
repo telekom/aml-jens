@@ -75,10 +75,10 @@ func (s *DrpPlayer) Start() error {
 				WARN.Printf("During DrPlay: %v", err.Err)
 			case util.ErrFatal:
 				FATAL.Printf("Something went wrong during DrPlay: %v", err.Err)
-				s.close_channel()
 				if s.is_shutting_down {
 					FATAL.Printf("^^ Above exception happend while DrPlay was already shutting down")
 				}
+				s.ExitNoWait()
 			default:
 				WARN.Printf("Unknown ErrLevel during Drplay: %+v", err)
 			}
@@ -88,9 +88,15 @@ func (s *DrpPlayer) Start() error {
 	}()
 
 	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", s.session.ChildDRP.GetName(), s.session.Dev, s.session.ChildDRP.Freq, s.session.ChildDRP.IsLooping())
-
 	if err := s.initTC(); err != nil {
 		return fmt.Errorf("initTC returned %w", err)
+	}
+
+	s.tc.ChangeTo(s.session.ChildDRP.Peek() * 1.33)
+	select {
+	case <-time.After(time.Millisecond * time.Duration(s.session.ChildDRP.WarmupTimeMs)):
+	case <-s.r.On_extern_exit_c:
+		return nil
 	}
 
 	if !s.session.ChildDRP.Nomeasure {
@@ -104,6 +110,7 @@ func (s *DrpPlayer) Start() error {
 		s.session.ChildDRP,
 		s.r,
 	)
+
 	return nil
 }
 func (s *DrpPlayer) exit_clean() {
@@ -147,21 +154,16 @@ func (s *DrpPlayer) Exit() {
 }
 func (s *DrpPlayer) initTC() error {
 	s.tc = trafficcontrol.NewTrafficControl(s.session.Dev)
-	//Resetting qdisc
-	//might fail - ignore
-	select {
-	case <-s.r.On_extern_exit_c:
-		return nil
-	case <-time.After(time.Duration(s.session.ChildDRP.WarmupTimeMs) * time.Millisecond):
-		_ = s.tc.Reset()
-	}
-	err := s.tc.Init(trafficcontrol.TrafficControlStartParams{
-		Datarate:     uint32(s.session.ChildDRP.Peek()),
+	settings := trafficcontrol.TrafficControlStartParams{
+		Datarate:     uint32(s.session.ChildDRP.Peek() * 2),
 		QueueSize:    int(s.session.Queuesizepackets),
 		AddonLatency: int(s.session.ExtralatencyMs),
 		Markfree:     int(s.session.Markfree),
 		Markfull:     int(s.session.Markfull),
-	},
+		Qosmode:      s.session.Qosmode,
+	}
+	DEBUG.Printf("Init Tc: %+v", settings)
+	err := s.tc.Init(settings,
 		trafficcontrol.NftStartParams{
 			L4sPremarking: s.session.L4sEnablePreMarking,
 			SignalStart:   s.session.SignalDrpStart,
