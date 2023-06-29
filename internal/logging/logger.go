@@ -86,7 +86,7 @@ func initLogger(name string, path string) {
 	if err != nil {
 		e, ok := err.(*fs.PathError)
 		if ok && e.Err == syscall.EACCES {
-			INFO.Printf("Could not Access '%s', tying '/tmp/logs'", path)
+			INFO.Printf("Could not Access '%s', trying '/tmp/logs'", path)
 			paths.LOG_PATH_UPDATE("/tmp/logs")
 			InitLogger(name)
 			return
