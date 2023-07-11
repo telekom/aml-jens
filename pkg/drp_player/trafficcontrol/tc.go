@@ -24,6 +24,7 @@ package trafficcontrol
 import (
 	"encoding/binary"
 	"fmt"
+	"strconv"
 
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/commands"
@@ -39,7 +40,8 @@ import (
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-const CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
+const JANZ_CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
+const MULTIJENS_CTRL_FILE = "/sys/kernel/debug/sch_multijens/0001:v1"
 
 type TrafficControlStartParams struct {
 	Datarate     uint32
@@ -48,10 +50,13 @@ type TrafficControlStartParams struct {
 	Markfree     int
 	Markfull     int
 	Qosmode      uint8
+	Uenum        uint8
 }
 type NftStartParams struct {
-	L4sPremarking bool
-	SignalStart   bool
+	L4sPremarking  bool
+	SignalStart    bool
+	DestinationIps []string
+	Uenum          uint8
 }
 
 func (p TrafficControlStartParams) validate() error {
@@ -72,6 +77,9 @@ func (p TrafficControlStartParams) validate() error {
 	}
 	if p.Qosmode < 0 || p.Qosmode > 2 {
 		return errortypes.NewUserInputError("valid values for qosmode are 0,1,2")
+	}
+	if p.Uenum < 0 || p.Uenum > 8 {
+		return errortypes.NewUserInputError("valid values for uenum are in [1..8]")
 	}
 
 	return nil
@@ -117,9 +125,9 @@ func NewTrafficControl(dev string) *TrafficControl {
 // Init sets NFT and TC to workable state, connects to custom qdisk.
 // After calling Init Close has to be called.
 func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartParams) error {
-	ResetECTMarking(assets.NFT_TABLE_PREMARK)
+	ResetNFT(assets.NFT_TABLE_PREMARK)
 	if nft.L4sPremarking {
-		err := CreateNftRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
+		err := CreateRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
 		if err != nil {
 			return err
 		}
@@ -141,7 +149,44 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 		return res.Error()
 	}
 	var err error
-	tc.control_file, err = os.OpenFile(CTRL_FILE, os.O_WRONLY, os.ModeAppend)
+	tc.control_file, err = os.OpenFile(JANZ_CTRL_FILE, os.O_WRONLY, os.ModeAppend)
+	return err
+}
+
+// Init sets NFT and TC to workable state, connects to custom qdisk.
+// After calling Init Close has to be called.
+func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft NftStartParams) error {
+	ResetNFT(assets.NFT_TABLE_PREMARK)
+	tc.nft = nft
+
+	if nft.L4sPremarking {
+		err := CreateRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
+		if err != nil {
+			return err
+		}
+	}
+	// create nft mark rules for queue assignment
+	ResetNFT(assets.NFT_TABLE_UEMARK)
+	err := CreateRulesMarkUe(tc.dev, tc.nft.DestinationIps)
+	if err != nil {
+		return err
+	}
+	if err := params.validate(); err != nil {
+		return err
+	}
+	if err := tc.Reset(); true {
+		DEBUG.Printf("TcReset: %v", err)
+	}
+	var args = []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "multijens", "uenum", strconv.FormatUint(uint64(params.Uenum), 10)}
+
+	args = append(args, params.asArgs()...)
+	time.Sleep(1 * time.Second)
+	DEBUG.Printf("Starting tc: %+v", args)
+	res := commands.ExecCommand("tc", args...)
+	if res.Error() != nil {
+		return res.Error()
+	}
+	tc.control_file, err = os.OpenFile(MULTIJENS_CTRL_FILE, os.O_WRONLY, os.ModeAppend)
 	return err
 }
 
@@ -156,10 +201,10 @@ func (tc *TrafficControl) Reset() error {
 func (tc *TrafficControl) Close() error {
 	DEBUG.Println("Closing tc")
 	if tc.nft.L4sPremarking {
-		ResetECTMarking(assets.NFT_TABLE_PREMARK)
+		ResetNFT(assets.NFT_TABLE_PREMARK)
 	}
 	if tc.nft.SignalStart {
-		ResetECTMarking(assets.NFT_TABLE_SIGNAL)
+		ResetNFT(assets.NFT_TABLE_SIGNAL)
 	}
 
 	_ = tc.Reset()
@@ -182,6 +227,19 @@ func (tc *TrafficControl) ChangeTo(rate float64) error {
 	return err
 }
 
+// Changes the current bandwidth limit to rate
+func (tc *TrafficControl) ChangeMultiTo(rate float64) error {
+	changeRateArray := make([]byte, 8*tc.nft.Uenum)
+	currentDataRateBit := uint64(rate) * 1000
+	tc.current_data_rate = rate
+	for i := 0; i < int(tc.nft.Uenum); i++ {
+		offset := i * 8
+		binary.LittleEndian.PutUint64(changeRateArray[offset:], currentDataRateBit)
+	}
+	_, err := tc.control_file.Write(changeRateArray)
+	return err
+}
+
 // Starts a goroutine that will change the current bandwidth restriciton.
 // A change will occur after the waitTime is exceeded.
 //
@@ -193,14 +251,14 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatype
 	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
 	if tc.nft.SignalStart {
 		go func() {
-			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
-			err := CreateNftRuleECT(tc.dev, assets.NFT_TABLE_SIGNAL, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect0", "1")
+			ResetNFT(assets.NFT_TABLE_SIGNAL)
+			err := CreateRuleECT(tc.dev, assets.NFT_TABLE_SIGNAL, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect0", "1")
 			if err != nil {
 				r.ReportFatal(err)
 				return
 			}
 			<-time.NewTimer(200 * time.Millisecond).C
-			ResetECTMarking(assets.NFT_TABLE_SIGNAL)
+			ResetNFT(assets.NFT_TABLE_SIGNAL)
 		}()
 	}
 	for {
@@ -225,6 +283,44 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatype
 			//change data rate in control file
 			if err := tc.ChangeTo(value); err != nil {
 				r.ReportFatal(fmt.Errorf("LaunchChangeLoop could not change Value: %w", err))
+				r.Wg.Done()
+				return
+			}
+		}
+	}
+}
+
+// Starts a goroutine that will change the current capacity restricitons.
+// A change will occur after the waitTime is exceeded.
+//
+// # Uses util.RoutineReport
+//
+// Blockig - also spawns 1 short lived routine
+func (tc *TrafficControl) LaunchMultiChangeLoop(waitTime time.Duration, drp *datatypes.DB_data_rate_pattern, r util.RoutineReport) {
+	ticker := time.NewTicker(waitTime)
+	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
+	for {
+		select {
+		case <-r.On_extern_exit_c:
+			DEBUG.Println("Closing TC-loop")
+			r.Wg.Done()
+			return
+		case <-ticker.C:
+			value, err := drp.Next()
+			if err != nil {
+				if _, ok := err.(*errortypes.IterableStopError); ok {
+					r.Application_has_finished <- "DataRatePattern has finished"
+					r.Wg.Done()
+					return
+				} else {
+					r.ReportWarn(fmt.Errorf("LaunchChangeLoop could retrieve next Value: %w", err))
+					r.Wg.Done()
+					return
+				}
+			}
+			//change data rate in control file
+			if err := tc.ChangeMultiTo(value); err != nil {
+				r.ReportFatal(fmt.Errorf("LaunchChangeLoop could not change value: %w", err))
 				r.Wg.Done()
 				return
 			}

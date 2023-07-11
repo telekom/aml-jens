@@ -3,6 +3,8 @@ package measuresession
 import (
 	"encoding/csv"
 	"fmt"
+	"github.com/telekom/aml-jens/internal/config"
+	"github.com/telekom/aml-jens/internal/persistence/psql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +41,13 @@ func NewMeasureSessionPersistor(session *datatypes.DB_session) (*MeasureSessionP
 		exit_persistor:    make(chan uint8),
 	}
 	if session.ParentBenchmark.PrintToStdOut {
-		fmt.Println(strings.Join(assets.CONST_HEADING, " "))
+		if session.ParentMultisession != nil {
+			if session.Uenum == 0 {
+				fmt.Println(strings.Join(append(assets.CONST_HEADING, "uenum"), " "))
+			}
+		} else {
+			fmt.Println(strings.Join(assets.CONST_HEADING, " "))
+		}
 	}
 	if session.ParentBenchmark.CsvOuptut {
 		DEBUG.Println("Initializing CSV")
@@ -155,6 +163,9 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 		report_error(fmt.Errorf("persistMeasures: %w", err), util.ErrWarn)
 	}
 	tickerPersist := time.NewTicker(s.persist_frequency)
+
+	db := &psql.DataBase{}
+	db.Init(&config.PlayCfg().Psql)
 	for {
 		select {
 		case <-s.exit_persistor:
@@ -194,7 +205,7 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 				}
 			}
 		}
-		(*s.db).Commit()
+		db.Commit()
 		//to csv
 		if s.csv != nil {
 			s.csv.PacketWriter.Flush()

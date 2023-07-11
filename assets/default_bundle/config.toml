@@ -10,6 +10,12 @@
   # qosmode=1: Any IPv6 and IPv4 traffic is sorted into the normal
   # qosmode=2: L4S mode, only ECT(1) ip packets get into high priority
   qosmode=2
+  # Number of queues for drmultiplay
+  uenum=8
+  destinationIps= [
+                		"192.168.178.119",
+                		"192.168.178.9"
+                		]
   # Mark non-ect(1) Traffic as enabled
   l4sEnabledPreMarking=false
   # Mark the first packets with special ect

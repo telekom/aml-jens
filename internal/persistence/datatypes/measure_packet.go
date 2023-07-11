@@ -37,6 +37,7 @@ type DB_measure_packet struct {
 	Capacitykbits       uint32
 	Net_flow_string     string
 	Net_flow_prio       uint8
+	Uenum               uint8
 }
 
 //go:inline
@@ -59,11 +60,11 @@ func (s *DB_measure_packet) GetSQLArgs() []any {
 
 //go:inline
 func (s *DB_measure_packet) CsvRecord() []string {
-	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped), fmt.Sprint(s.Net_flow_prio), s.Net_flow_string}
+	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped), fmt.Sprint(s.Net_flow_prio), s.Net_flow_string, fmt.Sprint(s.Uenum)}
 }
 
 //go:inline
 func (s *DB_measure_packet) PrintLine() error {
-	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, s.Net_flow_prio, s.Net_flow_string)
+	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, s.Net_flow_prio, s.Net_flow_string, s.Uenum)
 	return err
 }

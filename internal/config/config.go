@@ -58,6 +58,10 @@ func (c *config) readFromFile() error {
 	drp.WarmupTimeMs = viper.GetInt32("drp.WarmupBeforeDrpMs")
 	drp.Freq = -1
 	drp.Initial_scale = -1
+	multisession := datatypes.DB_multi_session{
+		UenumTotal:     uint8(viper.GetInt("tccommands.uenum")),
+		DestinationIps: viper.GetStringSlice("tccommands.destinationIps"),
+	}
 	asd := datatypes.DB_session{
 		//TC
 		Markfree:            viper.GetInt32("tccommands.markfree"),
@@ -74,7 +78,8 @@ func (c *config) readFromFile() error {
 		},
 	}
 	c.player = &DrPlayConfig{
-		A_Session: &asd,
+		A_MultiSession: &multisession,
+		A_Session:      &asd,
 		Psql: datatypes.Login{
 			Dbname:   viper.GetString("postgres.dbname"),
 			Host:     viper.GetString("postgres.host"),
@@ -132,6 +137,7 @@ func (c *config) setToDefaults() {
 		Qosmode:             0,
 		L4sEnablePreMarking: false,
 		SignalDrpStart:      false,
+		Uenum:               8,
 		//DRP
 		ChildDRP: drp,
 		ParentBenchmark: &datatypes.DB_benchmark{

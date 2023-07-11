@@ -5,7 +5,8 @@
       extralatency=10
 	  l4sEnabledPreMarking=true
 	  signalDrpStart=true
-	
+      numberOfQueues=8
+
 	[postgres]
 	  dbname = "dbname"
 	  host = "host"
