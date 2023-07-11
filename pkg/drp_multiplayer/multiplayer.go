@@ -3,6 +3,8 @@ package drpplayer
 import "C"
 import (
 	"fmt"
+	"github.com/telekom/aml-jens/internal/config"
+	"os"
 	"sync"
 	"time"
 
@@ -14,11 +16,12 @@ import (
 	"github.com/telekom/aml-jens/pkg/drp_player/trafficcontrol"
 )
 
+const MEASURE_FILE_MULTIJENS_PRAEFIX = "/sys/kernel/debug/sch_multijens/0001-"
+
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-const MEASURE_FILE_JENS = "/sys/kernel/debug/sch_janz/0001:0"
-
-type DrpPlayer struct {
+type DrpMultiPlayer struct {
+	multisession        *datatypes.DB_multi_session
 	session             *datatypes.DB_session
 	tc                  *trafficcontrol.TrafficControl
 	r                   util.RoutineReport
@@ -26,12 +29,13 @@ type DrpPlayer struct {
 	close_channel_mutex *sync.Mutex
 }
 
-func NewDrpPlayer(session *datatypes.DB_session) *DrpPlayer {
+func NewMultiPlayer(config *config.DrPlayConfig) *DrpMultiPlayer {
 	var wg sync.WaitGroup
 	var close_channel_mutex sync.Mutex
-	d := &DrpPlayer{
+	d := &DrpMultiPlayer{
 		is_shutting_down: false,
-		session:          session,
+		multisession:     config.A_MultiSession,
+		session:          config.A_Session,
 		r: util.RoutineReport{
 			Wg:               &wg,
 			On_extern_exit_c: make(chan uint8),
@@ -46,19 +50,7 @@ func NewDrpPlayer(session *datatypes.DB_session) *DrpPlayer {
 	return d
 }
 
-// Starts every component needed for the operation of Drplayer
-//
-// Includes, but is not limited to:
-//
-// - Persistence
-//   - csv &/ psql
-//
-// - Measure session
-//
-// - Data aggregation
-//
-// Non blocking
-func (s *DrpPlayer) Start() error {
+func (s *DrpMultiPlayer) Start() error {
 	go func() {
 		//Exit listener
 		select {
@@ -89,25 +81,41 @@ func (s *DrpPlayer) Start() error {
 		}
 	}()
 
-	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", s.session.ChildDRP.GetName(), s.session.Dev, s.session.ChildDRP.Freq, s.session.ChildDRP.IsLooping())
+	INFO.Printf("multi play data rate pattern %s on dev %s with %d queues frequency %d hz in loop mode %t\n", s.session.ChildDRP.GetName(), s.session.Dev, s.multisession.UenumTotal, s.session.ChildDRP.Freq, s.session.ChildDRP.IsLooping())
 	if err := s.initTC(); err != nil {
 		return fmt.Errorf("initTC returned %w", err)
 	}
-
-	s.tc.ChangeTo(s.session.ChildDRP.Peek() * 1.33)
-	select {
-	case <-time.After(time.Millisecond * time.Duration(s.session.ChildDRP.WarmupTimeMs)):
-	case <-s.r.On_extern_exit_c:
-		return nil
+	db, err := persistence.GetPersistence()
+	if err != nil {
+		FATAL.Println(err)
+		os.Exit(4)
 	}
+	// persist multisession
+	err = (*db).Persist(s.multisession)
+	if err != nil {
+		FATAL.Println(err)
+		os.Exit(1)
+	}
+	for i := 0; i < int(s.multisession.UenumTotal); i++ {
+		ueSession := *s.session
+		ueSession.Uenum = uint8(i)
+		ueSession.ParentMultisession = s.multisession
 
-	if !s.session.ChildDRP.Nomeasure {
-		ms := measuresession.NewMeasureSession(s.session, s.tc, MEASURE_FILE_JENS)
+		err = (*db).Persist(&ueSession)
+		if err != nil {
+			FATAL.Println(err)
+			os.Exit(1)
+		}
+		// filename to read queue measures
+		suffix := fmt.Sprintf("0%d:0", i)
+		thisMeasureFilename := MEASURE_FILE_MULTIJENS_PRAEFIX + suffix
+		ms := measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename)
 		s.r.Wg.Add(1)
 		go ms.Start(s.r)
 	}
+
 	s.r.Wg.Add(1)
-	go s.tc.LaunchChangeLoop(
+	go s.tc.LaunchMultiChangeLoop(
 		time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
 		s.session.ChildDRP,
 		s.r,
@@ -115,7 +123,7 @@ func (s *DrpPlayer) Start() error {
 
 	return nil
 }
-func (s *DrpPlayer) exit_clean() {
+func (s *DrpMultiPlayer) exit_clean() {
 	if err := s.tc.Close(); err != nil {
 		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
 	}
@@ -127,12 +135,12 @@ func (s *DrpPlayer) exit_clean() {
 		(*p_ptr).Commit()
 	}
 }
-func (s *DrpPlayer) Wait() {
+func (s *DrpMultiPlayer) Wait() {
 	s.r.Wg.Wait()
 	s.exit_clean()
 	DEBUG.Println("Player has exited")
 }
-func (s *DrpPlayer) close_channel() {
+func (s *DrpMultiPlayer) close_channel() {
 	s.close_channel_mutex.Lock()
 	if s.is_shutting_down {
 		s.close_channel_mutex.Unlock()
@@ -145,16 +153,16 @@ func (s *DrpPlayer) close_channel() {
 	s.close_channel_mutex.Unlock()
 
 }
-func (s *DrpPlayer) ExitNoWait() {
+func (s *DrpMultiPlayer) ExitNoWait() {
 	DEBUG.Println("DrpPlayer was asked to Exit()")
 	s.close_channel()
 }
 
-func (s *DrpPlayer) Exit() {
+func (s *DrpMultiPlayer) Exit() {
 	s.ExitNoWait()
 	s.Wait()
 }
-func (s *DrpPlayer) initTC() error {
+func (s *DrpMultiPlayer) initTC() error {
 	s.tc = trafficcontrol.NewTrafficControl(s.session.Dev)
 	settings := trafficcontrol.TrafficControlStartParams{
 		Datarate:     uint32(s.session.ChildDRP.Peek() * 2),
@@ -163,12 +171,15 @@ func (s *DrpPlayer) initTC() error {
 		Markfree:     int(s.session.Markfree),
 		Markfull:     int(s.session.Markfull),
 		Qosmode:      s.session.Qosmode,
+		Uenum:        s.multisession.UenumTotal,
 	}
 	DEBUG.Printf("Init Tc: %+v", settings)
-	err := s.tc.Init(settings,
+	err := s.tc.InitMultijens(settings,
 		trafficcontrol.NftStartParams{
-			L4sPremarking: s.session.L4sEnablePreMarking,
-			SignalStart:   s.session.SignalDrpStart,
+			L4sPremarking:  s.session.L4sEnablePreMarking,
+			SignalStart:    s.session.SignalDrpStart,
+			DestinationIps: s.multisession.DestinationIps,
+			Uenum:          s.multisession.UenumTotal,
 		})
 	return err
 }

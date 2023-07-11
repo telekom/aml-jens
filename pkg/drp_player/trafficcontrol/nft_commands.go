@@ -22,10 +22,15 @@
 package trafficcontrol
 
 import (
+	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/commands"
+	"strconv"
 )
 
-func CreateNftRuleECT(dev string, nftTable string, chainForward string, chainOutput string, ect string, priority string) error {
+const CHAIN_UEMARK_FORWARD = "uemarkforward"
+const CHAIN_UEMARK_OUTPUT = "uemarkoutput"
+
+func CreateRuleECT(dev string, nftTable string, chainForward string, chainOutput string, ect string, priority string) error {
 	if res := commands.ExecCommand("nft", "add", "table", "inet", nftTable); res.Error() != nil {
 		return res.Error()
 	}
@@ -50,10 +55,36 @@ func CreateNftRuleECT(dev string, nftTable string, chainForward string, chainOut
 	return nil
 }
 
-func ResetECTMarking(nftTable string) {
+func ResetNFT(nftTable string) {
 	res := commands.ExecCommand("nft", "delete", "table", "inet", nftTable)
 	err := res.Error()
 	if err != nil {
 		WARN.Println(err)
 	}
+}
+
+func CreateRulesMarkUe(dev string, ipaddresses []string) error {
+	if res := commands.ExecCommand("nft", "add", "table", "inet", assets.NFT_TABLE_UEMARK); res.Error() != nil {
+		return res.Error()
+	}
+
+	if res := commands.ExecCommand("nft", "add", "chain", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_FORWARD, "{", "type", "filter", "hook", "forward", "priority", "0", ";}"); res.Error() != nil {
+		return res.Error()
+	}
+
+	if res := commands.ExecCommand("nft", "add", "chain", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_OUTPUT, "{", "type", "filter", "hook", "output", "priority", "0", ";}"); res.Error() != nil {
+		return res.Error()
+	}
+	for i := 0; i < len(ipaddresses); i++ {
+		ipaddr := ipaddresses[i]
+		if res := commands.ExecCommand("nft", "add", "rule", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_FORWARD, "ip", "daddr", ipaddr, "meta", "mark", "set", strconv.Itoa(i+1), "counter"); res.Error() != nil {
+			return res.Error()
+		}
+		if res := commands.ExecCommand("nft", "add", "rule", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_OUTPUT, "ip", "daddr", ipaddr, "meta", "mark", "set", strconv.Itoa(i+1), "counter"); res.Error() != nil {
+			return res.Error()
+		}
+	}
+
+	DEBUG.Printf("enabled nft rules for %s", assets.NFT_TABLE_UEMARK)
+	return nil
 }

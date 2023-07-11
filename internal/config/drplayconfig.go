@@ -26,10 +26,11 @@ import "github.com/telekom/aml-jens/internal/persistence/datatypes"
 type DrPlayConfig struct {
 	Psql datatypes.Login
 	//The following will be set by drplayer:
-	PrintToStdOut bool
-	A_Session     *datatypes.DB_session
-	A_Csv         bool
-	A_Benchmark   *datatypes.DB_benchmark
+	PrintToStdOut  bool
+	A_MultiSession *datatypes.DB_multi_session
+	A_Session      *datatypes.DB_session
+	A_Csv          bool
+	A_Benchmark    *datatypes.DB_benchmark
 }
 
 func (s DrPlayConfig) GetDBObj() datatypes.DB_session {
