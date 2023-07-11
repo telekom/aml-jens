@@ -14,13 +14,13 @@ _dr_lsinterfaces()
         '/^[^ \t]/ { if ($1 ~ /^[0-9]+:/) { print $2 } else { print $1 } }' ) )
     COMPREPLY=( $( compgen -W '${COMPREPLY[@]/%[[:punct:]]/}' -S ' ' -- "$cur" ) )
 }
-_drplay()
+_drmultiplay()
 {
     local cur prev words cword opts final
     local IFS=$'\t\n'
     _init_completion -n = || return
 
-    opts="-dev$IFS-pattern$IFS-freq$IFS-csv$IFS-psql$IFS-loop$IFS-tag$IFS-scale$IFS-nomeasure"
+    opts="-dev$IFS-pattern$IFS-freq$IFS-csv$IFS-psql$IFS-loop$IFS-tag$IFS-scale"
     # Remove already used opts
     blacklist=()
     options=($opts)
@@ -54,7 +54,7 @@ _drplay()
         opts=("${opts[@]/$item}")
     done
 
-    # Show context sensitive opts
+    # Show context senitive opts
     case $prev in
     -dev)
 	    _dr_lsinterfaces -a
@@ -76,4 +76,4 @@ _drplay()
     esac
 }
 
-complete -o nospace -F  _drplay drplay
+complete -o nospace -F  _drmultiplay drmultiplay
