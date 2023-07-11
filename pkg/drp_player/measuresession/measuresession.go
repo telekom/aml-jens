@@ -149,8 +149,6 @@ type DbQueueMeasure struct {
 	memUsageBytes          uint32
 }
 
-const MM_FILE = "/sys/kernel/debug/sch_janz/0001:0"
-
 const SAMPLE_DURATION_MS = 10
 
 type MeasureSession struct {
@@ -162,9 +160,10 @@ type MeasureSession struct {
 	wg                  *sync.WaitGroup
 	should_end          bool
 	persistor           *MeasureSessionPersistor
+	queueFilename       string
 }
 
-func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl) MeasureSession {
+func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, queueFilename string) MeasureSession {
 	monotonicMs := uint64(C.get_nsecs()) / 1e6
 	systemMs := uint64(time.Now().UnixMilli())
 	var wg sync.WaitGroup
@@ -181,6 +180,7 @@ func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.Traffic
 		wg:                  &wg,
 		should_end:          false,
 		persistor:           p,
+		queueFilename:       queueFilename,
 	}
 
 }
@@ -213,7 +213,7 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 		m.wg.Done()
 	})
 	m.wg.Add(1)
-	go m.poll(r)
+	go m.poll(r, m.queueFilename)
 
 	m.wg.Add(1)
 	go m.aggregateMeasures(r)
@@ -226,10 +226,10 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 // Represents the polling loop.
 // Will close if membervariable m.shouldEnd becomes true
 // Will foreward this signal by closing chan_to_aggregation
-func (m *MeasureSession) poll(r util.RoutineReport) {
+func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 	//Buffer in which the contets of MM_FILE will be written
 	recordArray := make(RecordArray, RECORD_SIZE)
-	var file, err = os.Open(MM_FILE)
+	var file, err = os.Open(measureFileName)
 	if err != nil {
 		r.ReportFatal(fmt.Errorf("measuresession.poll: %w", err))
 	}
@@ -366,6 +366,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 			// send to persist measure sample
 			currentEpochMs := message.timestampMs + m.time_diff
 			sample := aggregated_measure.toDB_measure_packet(currentEpochMs)
+			sample.Uenum = m.session.Uenum
 			if m.session.ParentBenchmark.CsvOuptut {
 				if sample.Capacitykbits == 0 {
 					//this sometimes happens
