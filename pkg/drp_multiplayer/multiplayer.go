@@ -176,10 +176,10 @@ func (s *DrpMultiPlayer) initTC() error {
 	DEBUG.Printf("Init Tc: %+v", settings)
 	err := s.tc.InitMultijens(settings,
 		trafficcontrol.NftStartParams{
-			L4sPremarking:  s.session.L4sEnablePreMarking,
-			SignalStart:    s.session.SignalDrpStart,
-			DestinationIps: s.multisession.DestinationIps,
-			Uenum:          s.multisession.UenumTotal,
+			L4sPremarking: s.session.L4sEnablePreMarking,
+			SignalStart:   s.session.SignalDrpStart,
+			Netflows:      s.multisession.Netflows,
+			Uenum:         s.multisession.UenumTotal,
 		})
 	return err
 }

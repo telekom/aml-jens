@@ -25,7 +25,7 @@ type DB_multi_session struct {
 	Multisession_id int
 	Name            string
 	UenumTotal      uint8
-	DestinationIps  []string
+	Netflows        []string
 }
 
 // Executes a sqlstmt to Insert this session into DB

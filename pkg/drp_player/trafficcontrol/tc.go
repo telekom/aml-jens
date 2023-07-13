@@ -53,10 +53,10 @@ type TrafficControlStartParams struct {
 	Uenum        uint8
 }
 type NftStartParams struct {
-	L4sPremarking  bool
-	SignalStart    bool
-	DestinationIps []string
-	Uenum          uint8
+	L4sPremarking bool
+	SignalStart   bool
+	Netflows      []string
+	Uenum         uint8
 }
 
 func (p TrafficControlStartParams) validate() error {
@@ -167,7 +167,7 @@ func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft Nf
 	}
 	// create nft mark rules for queue assignment
 	ResetNFT(assets.NFT_TABLE_UEMARK)
-	err := CreateRulesMarkUe(tc.dev, tc.nft.DestinationIps)
+	err := CreateRulesMarkUe(tc.nft.Netflows)
 	if err != nil {
 		return err
 	}
