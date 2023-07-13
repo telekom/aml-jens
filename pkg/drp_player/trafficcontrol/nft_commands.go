@@ -63,7 +63,7 @@ func ResetNFT(nftTable string) {
 	}
 }
 
-func CreateRulesMarkUe(dev string, ipaddresses []string) error {
+func CreateRulesMarkUe(Netflows []string) error {
 	if res := commands.ExecCommand("nft", "add", "table", "inet", assets.NFT_TABLE_UEMARK); res.Error() != nil {
 		return res.Error()
 	}
@@ -75,12 +75,14 @@ func CreateRulesMarkUe(dev string, ipaddresses []string) error {
 	if res := commands.ExecCommand("nft", "add", "chain", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_OUTPUT, "{", "type", "filter", "hook", "output", "priority", "0", ";}"); res.Error() != nil {
 		return res.Error()
 	}
-	for i := 0; i < len(ipaddresses); i++ {
-		ipaddr := ipaddresses[i]
-		if res := commands.ExecCommand("nft", "add", "rule", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_FORWARD, "ip", "daddr", ipaddr, "meta", "mark", "set", strconv.Itoa(i+1), "counter"); res.Error() != nil {
+	for i := 0; i < len(Netflows); i++ {
+		netflow := Netflows[i]
+		//netflowArray := strings.Split(netflow, " ")
+
+		if res := commands.ExecCommand("nft", "add", "rule", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_FORWARD, netflow, "meta", "mark", "set", strconv.Itoa(i+1), "counter"); res.Error() != nil {
 			return res.Error()
 		}
-		if res := commands.ExecCommand("nft", "add", "rule", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_OUTPUT, "ip", "daddr", ipaddr, "meta", "mark", "set", strconv.Itoa(i+1), "counter"); res.Error() != nil {
+		if res := commands.ExecCommand("nft", "add", "rule", "inet", assets.NFT_TABLE_UEMARK, CHAIN_UEMARK_OUTPUT, netflow, "meta", "mark", "set", strconv.Itoa(i+1), "counter"); res.Error() != nil {
 			return res.Error()
 		}
 	}

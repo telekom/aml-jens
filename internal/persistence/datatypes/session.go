@@ -59,6 +59,10 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 		return err
 	}
 
+	var multisessionId int
+	if s.ParentMultisession != nil {
+		multisessionId = s.ParentMultisession.Multisession_id
+	}
 	err = stmt.QueryRow(`INSERT INTO session_tag (
 	benchmark_id,
 	name,
@@ -70,7 +74,7 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 	extralatency,
 	qosmode,
 	l4sEnablePreMarking,
-    fk_multisession_id
+    multisession_id
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING session_id`,
 		s.getBenchmarkId(),
 		s.Name,
@@ -82,7 +86,7 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 		s.ExtralatencyMs,
 		s.Qosmode,
 		s.L4sEnablePreMarking,
-		s.ParentMultisession.Multisession_id).Scan(&s.Session_id)
+		multisessionId).Scan(&s.Session_id)
 	return err
 }
 

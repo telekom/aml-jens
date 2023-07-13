@@ -59,8 +59,8 @@ func (c *config) readFromFile() error {
 	drp.Freq = -1
 	drp.Initial_scale = -1
 	multisession := datatypes.DB_multi_session{
-		UenumTotal:     uint8(viper.GetInt("tccommands.uenum")),
-		DestinationIps: viper.GetStringSlice("tccommands.destinationIps"),
+		UenumTotal: uint8(viper.GetInt("tccommands.uenum")),
+		Netflows:   viper.GetStringSlice("tccommands.netflows"),
 	}
 	asd := datatypes.DB_session{
 		//TC

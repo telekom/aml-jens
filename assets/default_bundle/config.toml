@@ -11,11 +11,14 @@
   # qosmode=2: L4S mode, only ECT(1) ip packets get into high priority
   qosmode=2
   # Number of queues for drmultiplay
-  uenum=8
-  destinationIps= [
-                		"192.168.178.119",
-                		"192.168.178.9"
-                		]
+  uenum=6
+
+  # Define a netflow for each UE in your test setup, the syntax of the filter is in nft syntax
+  netflows= [
+                    "ip saddr 192.168.2.0/24 udp sport 22 ip daddr 192.168.0.1 udp dport 22", # UE1
+                    "ip daddr 192.168.178.75", # UE2
+                    "ip daddr 192.168.178.9" # UE3
+               		]
   # Mark non-ect(1) Traffic as enabled
   l4sEnabledPreMarking=false
   # Mark the first packets with special ect
