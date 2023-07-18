@@ -74,8 +74,9 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 	extralatency,
 	qosmode,
 	l4sEnablePreMarking,
+	uenum,
     multisession_id
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING session_id`,
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING session_id`,
 		s.getBenchmarkId(),
 		s.Name,
 		s.Time,
@@ -86,6 +87,7 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 		s.ExtralatencyMs,
 		s.Qosmode,
 		s.L4sEnablePreMarking,
+		s.Uenum,
 		multisessionId).Scan(&s.Session_id)
 	return err
 }
