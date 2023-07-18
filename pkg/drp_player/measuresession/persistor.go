@@ -204,8 +204,8 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 					readSamples = false
 				}
 			}
+			db.Commit()
 		}
-		db.Commit()
 		//to csv
 		if s.csv != nil {
 			s.csv.PacketWriter.Flush()
