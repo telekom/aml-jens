@@ -152,20 +152,25 @@ func (s *MeasureSessionPersistor) persist(sample interface{}) error {
 	return nil
 }
 
+func GetPersistence() *persistence.Persistence {
+	db := &psql.DataBase{}
+	db.Init(&config.PlayCfg().Psql)
+	var persistence persistence.Persistence = db
+	return &persistence
+}
+
 // Stars Loop, which persits any samples coming in through the samples channel
 //
 // Blocking, releases Wg
 func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error func(err error, lvl util.ErrorLevel), done func()) {
 	//Setup
 	var err error
-	s.db, err = persistence.GetPersistence()
+	s.db = GetPersistence()
 	if err != nil {
 		report_error(fmt.Errorf("persistMeasures: %w", err), util.ErrWarn)
 	}
 	tickerPersist := time.NewTicker(s.persist_frequency)
 
-	db := &psql.DataBase{}
-	db.Init(&config.PlayCfg().Psql)
 	for {
 		select {
 		case <-s.exit_persistor:
@@ -204,8 +209,8 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 					readSamples = false
 				}
 			}
-			db.Commit()
 		}
+		(*s.db).Commit()
 		//to csv
 		if s.csv != nil {
 			s.csv.PacketWriter.Flush()

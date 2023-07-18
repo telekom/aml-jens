@@ -198,46 +198,41 @@ func (s *DataBase) persist_measurequeue(data datatypes.DB_measure_queue) error {
 //
 //go:inline
 func (s *DataBase) Commit() {
-	go func(self *DataBase) {
-		var err error
-		self.txMqMutex.Lock()
-		//DEBUG.Println("Committing txMQ")
-		if err := self.txMQ.Commit(); err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
-		}
-		self.txMQ, err = self.db.Begin()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not create transaction of measure_queue: check logs / db")
-		}
-		self.stmt_queue, err = self.txMQ.Prepare(datatypes.DB_measure_queue{}.GetSQLStatement())
-		self.txMqMutex.Unlock()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not prepare preparedstatments of measure_queue: check logs / db")
-		}
-	}(s)
-	go func(self *DataBase) {
-		var err error
-		self.txMpMutex.Lock()
-		//DEBUG.Println("Committing txMP")
-		if err := self.txMP.Commit(); err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
-		}
-		self.txMP, err = self.db.Begin()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not create transaction of measure_packet: check logs / db")
-		}
-		self.stmt_packet, err = self.txMP.Prepare(datatypes.DB_measure_packet{}.GetSQLStatement())
-		self.txMpMutex.Unlock()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not prepare preparedstatments of measure_packet: check logs / db")
-		}
-	}(s)
+	var err error
+	s.txMqMutex.Lock()
+	//DEBUG.Println("Committing txMQ")
+	if err := s.txMQ.Commit(); err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
+	}
+	s.txMQ, err = s.db.Begin()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not create transaction of measure_queue: check logs / db")
+	}
+	s.stmt_queue, err = s.txMQ.Prepare(datatypes.DB_measure_queue{}.GetSQLStatement())
+	s.txMqMutex.Unlock()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not prepare preparedstatments of measure_queue: check logs / db")
+	}
+	s.txMpMutex.Lock()
+	//DEBUG.Println("Committing txMP")
+	if err := s.txMP.Commit(); err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
+	}
+	s.txMP, err = s.db.Begin()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not create transaction of measure_packet: check logs / db")
+	}
+	s.stmt_packet, err = s.txMP.Prepare(datatypes.DB_measure_packet{}.GetSQLStatement())
+	s.txMpMutex.Unlock()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not prepare preparedstatments of measure_packet: check logs / db")
+	}
 }
 
 //go:inline
