@@ -235,8 +235,9 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 	}
 	/* Clear recordArray due to records in WarmupTime*/
 	if m.session.ChildDRP.WarmupTimeMs > 0 {
-		dummy := make([]byte, 0xffffffff)
+		dummy := make([]byte, 0xfffff)
 		file.Read(dummy)
+		dummy = nil
 	}
 	defer func() {
 		DEBUG.Println("Closed: Poll")
