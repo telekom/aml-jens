@@ -78,8 +78,8 @@ func (p TrafficControlStartParams) validate() error {
 	if p.Qosmode < 0 || p.Qosmode > 2 {
 		return errortypes.NewUserInputError("valid values for qosmode are 0,1,2")
 	}
-	if p.Uenum < 0 || p.Uenum > 8 {
-		return errortypes.NewUserInputError("valid values for uenum are in [1..8]")
+	if p.Uenum < 0 || p.Uenum > 16 {
+		return errortypes.NewUserInputError("valid values for uenum are in [1..16]")
 	}
 
 	return nil
