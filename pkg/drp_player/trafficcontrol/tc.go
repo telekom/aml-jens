@@ -42,6 +42,7 @@ var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 const JANZ_CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
 const MULTIJENS_CTRL_FILE = "/sys/kernel/debug/sch_multijens/0001:v1"
+const MAX_UENUM = 16
 
 type TrafficControlStartParams struct {
 	Datarate     uint32
@@ -57,6 +58,14 @@ type NftStartParams struct {
 	SignalStart   bool
 	Netflows      []string
 	Uenum         uint8
+}
+
+func (p NftStartParams) validate() error {
+	if len(p.Netflows) > MAX_UENUM {
+		return errortypes.NewUserInputError("naximum filter rules for ue/netflows = %d", MAX_UENUM)
+	}
+
+	return nil
 }
 
 func (p TrafficControlStartParams) validate() error {
@@ -78,7 +87,7 @@ func (p TrafficControlStartParams) validate() error {
 	if p.Qosmode < 0 || p.Qosmode > 2 {
 		return errortypes.NewUserInputError("valid values for qosmode are 0,1,2")
 	}
-	if p.Uenum < 0 || p.Uenum > 16 {
+	if p.Uenum < 0 || p.Uenum > MAX_UENUM {
 		return errortypes.NewUserInputError("valid values for uenum are in [1..16]")
 	}
 
@@ -167,10 +176,14 @@ func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft Nf
 	}
 	// create nft mark rules for queue assignment
 	ResetNFT(assets.NFT_TABLE_UEMARK)
+	if err := nft.validate(); err != nil {
+		return err
+	}
 	err := CreateRulesMarkUe(tc.nft.Netflows)
 	if err != nil {
 		return err
 	}
+
 	if err := params.validate(); err != nil {
 		return err
 	}
@@ -205,6 +218,9 @@ func (tc *TrafficControl) Close() error {
 	}
 	if tc.nft.SignalStart {
 		ResetNFT(assets.NFT_TABLE_SIGNAL)
+	}
+	if tc.nft.Uenum > 0 {
+		ResetNFT(assets.NFT_TABLE_UEMARK)
 	}
 
 	_ = tc.Reset()
