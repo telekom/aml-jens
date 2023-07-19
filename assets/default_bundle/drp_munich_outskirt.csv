@@ -1,9 +1,10 @@
 # =======================================
-#           drp_munich_autobahn
+#           drp_munich_outskirt
 # =======================================
 # iperf3 DataRatePattern (UDP)
 # This DRP was recorded on a smaller Umgehungsstraße
 # in the wieder area of munich.
+# The values have been smoothened, null values have been removed.
 #
 # :recommended_freqeuncy=10
 # :th_mq_latency=1.6,2.5
