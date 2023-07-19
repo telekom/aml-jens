@@ -3,7 +3,7 @@
 # =======================================
 # Synthetic DataRatePattern
 # This DRP was generated with a falling curve from 60 to 12 Mbits as base,
-# noise is added, sin waves of different frequencies are added.
+# noise was added, sine waves of different frequencies have been added.
 #
 # :recommended_freqeuncy=10
 # :th_mq_latency=4,8
