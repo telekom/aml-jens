@@ -4,6 +4,7 @@
 # iperf3 DataRatePattern (UDP)
 # This DRP was recorded both on a Autobahn and a Bundesstraße
 # in the wieder area of munich.
+# The values have been smoothened, null values have been removed.
 #
 # :recommended_freqeuncy=10
 # :th_mq_latency=1.6,2.5

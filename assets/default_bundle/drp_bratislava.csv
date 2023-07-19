@@ -5,7 +5,7 @@
 # This DRP was extracted from the logs of an eNodeB.
 # A single UE was driving in a car in circles.
 # all Values had to be scaled down.
-#
+# Furthermore, the values have been smoothened, null values have been removed.
 # :recommended_freqeuncy=10
 # :th_mq_latency=1.6,2.5
 # :th_p95_latency=19,21
