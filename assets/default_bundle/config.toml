@@ -10,19 +10,22 @@
   # qosmode=1: Any IPv6 and IPv4 traffic is sorted into the normal
   # qosmode=2: L4S mode, only ECT(1) ip packets get into high priority
   qosmode=2
-  # Number of queues for drmultiplay
-  uenum=6
+  # Mark non-ect(1) Traffic as enabled
+  l4sEnabledPreMarking=false
+  # Mark the first packets with special ect
+  signalDrpStart=false
 
+[drplay]
+  # Total number of queues for drplay
+  uenum=6
+  # load in kbits of a netflow as threshold to assign it to an own queue
+  ueminloadkbits=1000
   # Define a netflow for each UE in your test setup, the syntax of the filter is in nft syntax
   netflows= [
                     "ip saddr 192.168.2.0/24 udp sport 22 ip daddr 192.168.0.1 udp dport 22", # UE1
                     "ip daddr 192.168.178.75", # UE2
                     "ip daddr 192.168.178.9" # UE3
                		]
-  # Mark non-ect(1) Traffic as enabled
-  l4sEnabledPreMarking=false
-  # Mark the first packets with special ect
-  signalDrpStart=false
 
 [postgres]
   dbname = "l4s_measure"

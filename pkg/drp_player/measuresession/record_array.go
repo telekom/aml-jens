@@ -84,7 +84,13 @@ func (record RecordArray) AsPacketMeasure(session_id int) (*PacketMeasure, error
 	nextHdr := record[53]
 	var srcPort uint16 = 0
 	var dstPort uint16 = 0
+	var transportProtocoll string = ""
 	if nextHdr == 6 || nextHdr == 17 {
+		if nextHdr == 6 {
+			transportProtocoll = "tcp"
+		} else {
+			transportProtocoll = "udp"
+		}
 		srcPort = uint16(binary.LittleEndian.Uint16(record[54:56]))
 		dstPort = uint16(binary.LittleEndian.Uint16(record[56:58]))
 	}
@@ -95,12 +101,13 @@ func (record RecordArray) AsPacketMeasure(session_id int) (*PacketMeasure, error
 	var prio uint8 = record[51] & 0b11000000 >> 6
 	record[51] = record[51] & 0b00111111
 	flow := datatypes.DB_network_flow{
-		Source_ip:        srcIp,
-		Source_port:      srcPort,
-		Destination_ip:   dstIp,
-		Destination_port: dstPort,
-		Session_id:       session_id,
-		Prio:             prio,
+		TransportProtocoll: transportProtocoll,
+		Source_ip:          srcIp,
+		Source_port:        srcPort,
+		Destination_ip:     dstIp,
+		Destination_port:   dstPort,
+		Session_id:         session_id,
+		Prio:               prio,
 	}
 
 	packetMeasure := PacketMeasure{

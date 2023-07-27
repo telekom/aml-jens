@@ -212,7 +212,6 @@ func (b *Benchmark) play_session(db *persistence.Persistence, session_copy datat
 		return err, nil
 	}
 	b.player.Wait()
-	(*db).ClearCache()
 
 	return nil, v
 }

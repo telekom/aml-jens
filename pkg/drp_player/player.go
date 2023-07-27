@@ -102,7 +102,7 @@ func (s *DrpPlayer) Start() error {
 	}
 
 	if !s.session.ChildDRP.Nomeasure {
-		ms := measuresession.NewMeasureSession(s.session, s.tc, MEASURE_FILE_JENS)
+		ms := measuresession.NewMeasureSession(s.session, s.tc, MEASURE_FILE_JENS, true)
 		s.r.Wg.Add(1)
 		go ms.Start(s.r)
 	}

@@ -25,7 +25,8 @@ type DB_multi_session struct {
 	Multisession_id int
 	Name            string
 	UenumTotal      uint8
-	Netflows        []string
+	FixedNetflows   []string
+	UeMinloadkbits  uint32
 }
 
 // Executes a sqlstmt to Insert this session into DB

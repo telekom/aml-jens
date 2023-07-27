@@ -56,51 +56,62 @@ type DB_network_flow = datatypes.DB_network_flow
 type DB_measure_queue = datatypes.DB_measure_queue
 
 type AggregateMeasure struct {
-	sampleCount      uint32
-	sumSojournTimeMs uint32
-	sumloadBytes     uint32
-	sumCapacityKbits int64
-	sumEcnNCE        uint32
-	sumDropped       uint32
-	net_flow         *datatypes.DB_network_flow
-	t_start          uint64
-	t_end            uint64
+	sampleCount       uint32
+	sumSojournTimeMs  uint32
+	sumloadBytes      uint64
+	sumCapacityKbits  int64
+	sumEcnNCE         uint32
+	sumDropped        uint32
+	Net_flow          *datatypes.DB_network_flow
+	t_start           uint64
+	t_end             uint64
+	SumloadTotalBytes uint64
 }
 
 var currentCapacityKbits uint64
 
 func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
-	var sampleCapacityKbits uint32
+	var sampleCapacityKbits uint64
 	sample_duration := util.MaxInt(SAMPLE_DURATION_MS, int(s.t_end-s.t_start))
-	loadKbits := ((s.sumloadBytes * 8) / 1000) * (1000 / uint32(sample_duration))
+	loadKbits := ((s.sumloadBytes * 8) / 1000) * (1000 / uint64(sample_duration))
 	if s.sumCapacityKbits == -1 {
 		sampleCapacityKbits = loadKbits
 	} else {
-		sampleCapacityKbits = uint32(s.sumCapacityKbits) / s.sampleCount
+		sampleCapacityKbits = uint64(s.sumCapacityKbits) / uint64(s.sampleCount)
 	}
 	return DB_measure_packet{
 		Time:                time,
 		PacketSojournTimeMs: s.sumSojournTimeMs / s.sampleCount,
-		LoadKbits:           loadKbits,
+		LoadKbits:           uint32(loadKbits),
 		Ecn:                 uint32((float32(s.sumEcnNCE) / float32(s.sampleCount)) * 100),
 		Dropped:             s.sumDropped,
-		Fk_flow_id:          s.net_flow.Flow_id,
-		Capacitykbits:       sampleCapacityKbits,
-		Net_flow_string:     s.net_flow.MeasureIdStr(),
-		Net_flow_prio:       s.net_flow.Prio,
+		Fk_flow_id:          s.Net_flow.Flow_id,
+		Capacitykbits:       uint32(sampleCapacityKbits),
+		Net_flow_string:     s.Net_flow.MeasureIdStr(),
+		Net_flow_prio:       s.Net_flow.Prio,
 	}
+}
+func (s *AggregateMeasure) reset() {
+	s.sumloadBytes = 0
+	s.sumDropped = 0
+	s.sumEcnNCE = 0
+	s.sumCapacityKbits = 0
+	s.sumSojournTimeMs = 0
+	s.t_start = 0
+	s.t_end = 0
 }
 
 func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 	return &AggregateMeasure{
-		sumloadBytes:     0,
-		sumDropped:       0,
-		sumEcnNCE:        0,
-		sumSojournTimeMs: 0,
-		sampleCount:      0,
-		net_flow:         flow,
-		t_start:          0,
-		t_end:            0,
+		sumloadBytes:      0,
+		sumDropped:        0,
+		sumEcnNCE:         0,
+		sumSojournTimeMs:  0,
+		sampleCount:       0,
+		Net_flow:          flow,
+		t_start:           0,
+		t_end:             0,
+		SumloadTotalBytes: 0,
 	}
 }
 
@@ -116,7 +127,9 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	}
 	// aggregate sample values
 	s.sumSojournTimeMs += pm.sojournTimeMs
-	s.sumloadBytes += pm.packetSizeByte
+	s.sumloadBytes += uint64(pm.packetSizeByte)
+	// for statistics
+	s.SumloadTotalBytes += uint64(pm.packetSizeByte)
 	//Fix for setting capacity to maximum
 	if capacity == 4294967295 {
 		//if dummy capacity.
@@ -152,18 +165,20 @@ type DbQueueMeasure struct {
 const SAMPLE_DURATION_MS = 10
 
 type MeasureSession struct {
-	session             *datatypes.DB_session
-	tc                  *trafficcontrol.TrafficControl
-	chan_to_aggregation chan PacketMeasure
-	chan_to_persistence chan interface{}
-	time_diff           uint64
-	wg                  *sync.WaitGroup
-	should_end          bool
-	persistor           *MeasureSessionPersistor
-	queueFilename       string
+	Session                    *datatypes.DB_session
+	tc                         *trafficcontrol.TrafficControl
+	chan_to_aggregation        chan PacketMeasure
+	chan_to_persistence        chan interface{}
+	time_diff                  uint64
+	Wg                         *sync.WaitGroup
+	should_end                 bool
+	Persistor                  *MeasureSessionPersistor
+	queueFilename              string
+	AggregateMeasurePerNetflow map[string]*AggregateMeasure
+	FixedNetflow               bool
 }
 
-func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, queueFilename string) MeasureSession {
+func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, queueFilename string, fixedNetflow bool) MeasureSession {
 	monotonicMs := uint64(C.get_nsecs()) / 1e6
 	systemMs := uint64(time.Now().UnixMilli())
 	var wg sync.WaitGroup
@@ -171,22 +186,25 @@ func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.Traffic
 	if err != nil {
 		WARN.Printf("Could not create persisitor: %v", err)
 	}
+
 	return MeasureSession{
-		session:             session,
-		tc:                  tc,
-		chan_to_aggregation: make(chan PacketMeasure, 10000),
-		chan_to_persistence: make(chan interface{}, 10000),
-		time_diff:           systemMs - monotonicMs,
-		wg:                  &wg,
-		should_end:          false,
-		persistor:           p,
-		queueFilename:       queueFilename,
+		Session:                    session,
+		tc:                         tc,
+		chan_to_aggregation:        make(chan PacketMeasure, 10000),
+		chan_to_persistence:        make(chan interface{}, 10000),
+		time_diff:                  systemMs - monotonicMs,
+		Wg:                         &wg,
+		should_end:                 false,
+		Persistor:                  p,
+		queueFilename:              queueFilename,
+		AggregateMeasurePerNetflow: make(map[string]*AggregateMeasure),
+		FixedNetflow:               fixedNetflow,
 	}
 
 }
 func (m MeasureSession) Start(r util.RoutineReport) {
 	// open memory file stream
-	INFO.Println("start measure session")
+	INFO.Println("start measure Session")
 
 	// compute offset of monotonic and system clock
 
@@ -195,11 +213,11 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 	go func() {
 		<-r.On_extern_exit_c
 		m.should_end = true
-		m.persistor.Exit()
+		m.Persistor.Exit()
 	}()
 
-	m.wg.Add(1)
-	go m.persistor.Run(m.chan_to_persistence, func(err error, level util.ErrorLevel) {
+	m.Wg.Add(1)
+	go m.Persistor.Run(m.chan_to_persistence, func(err error, level util.ErrorLevel) {
 		r.Send_error_c <- struct {
 			Err   error
 			Level util.ErrorLevel
@@ -209,16 +227,16 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 		}
 	}, func() {
 
-		DEBUG.Println("Closing persistor")
-		m.wg.Done()
+		DEBUG.Println("Closing Persistor")
+		m.Wg.Done()
 	})
-	m.wg.Add(1)
+	m.Wg.Add(1)
 	go m.poll(r, m.queueFilename)
 
-	m.wg.Add(1)
+	m.Wg.Add(1)
 	go m.aggregateMeasures(r)
 
-	m.wg.Wait()
+	m.Wg.Wait()
 	DEBUG.Println("Closed measure_session")
 	r.Wg.Done()
 }
@@ -234,7 +252,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 		r.ReportFatal(fmt.Errorf("measuresession.poll: %w", err))
 	}
 	/* Clear recordArray due to records in WarmupTime*/
-	if m.session.ChildDRP.WarmupTimeMs > 0 {
+	if m.Session.ChildDRP.WarmupTimeMs > 0 {
 		dummy := make([]byte, 0xfffff)
 		file.Read(dummy)
 		dummy = nil
@@ -244,7 +262,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 		if file != nil {
 			file.Close()
 		}
-		m.wg.Done()
+		m.Wg.Done()
 		//Forward closing to aggregation
 		close(m.chan_to_aggregation)
 	}()
@@ -270,7 +288,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 		timestampMs := uint64(binary.LittleEndian.Uint64(recordArray[0:8])) / 1e6
 		switch recordArray.type_id() {
 		case RECORD_TYPE_P: // PacketMeasure MP
-			packetMeasure, err := recordArray.AsPacketMeasure(m.session.Session_id)
+			packetMeasure, err := recordArray.AsPacketMeasure(m.Session.Session_id)
 			if err != nil {
 				r.ReportWarn(fmt.Errorf("could not parse packetMeasure: %w", err))
 			}
@@ -290,7 +308,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 				Memoryusagebytes:  memUsageBytes,
 				PacketsInQueue:    numberOfPacketsInQueue,
 				CapacityKbits:     currentCapacityKbits,
-				Fk_session_tag_id: m.session.Session_id,
+				Fk_session_tag_id: m.Session.Session_id,
 			}
 			if !m.should_end {
 				m.chan_to_persistence <- queueMeasure
@@ -308,7 +326,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 	defer func() {
 		DEBUG.Println("Closed AggregateMeasures")
 		close(m.chan_to_persistence)
-		m.wg.Done()
+		//m.Wg.Done()
 	}()
 	doExit := false
 	p, err := persistence.GetPersistence()
@@ -317,7 +335,6 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 		return
 	}
 	for range ticker.C {
-		mapMeasures := make(map[string]*AggregateMeasure)
 		readMessages := true
 		var packetStartTimeMs uint64 = 0
 		message, is_open := <-m.chan_to_aggregation
@@ -340,18 +357,18 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 				if diffMs >= sampleDuration.Milliseconds() {
 					readMessages = false
 				}
-				if err := (*p).Persist(message.net_flow); err != nil {
-					r.ReportFatal(fmt.Errorf("aggregateMeasure: %w", err))
-					return
-				}
-				measure, keyExists := mapMeasures[message.net_flow.MeasureIdStr()]
+				measure, keyExists := m.AggregateMeasurePerNetflow[message.net_flow.MeasureIdStr()]
 				if !keyExists {
 					measure = NewAggregateMeasure(message.net_flow)
-					mapMeasures[message.net_flow.MeasureIdStr()] = measure
+					m.AggregateMeasurePerNetflow[message.net_flow.MeasureIdStr()] = measure
+
+					if err := (*p).Persist(message.net_flow); err != nil {
+						r.ReportFatal(fmt.Errorf("aggregateMeasure: %w", err))
+						return
+					}
 				}
 
 				measure.add(&message, currentCapacityKbits)
-
 			default:
 				readMessages = false
 			}
@@ -360,15 +377,15 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 			DEBUG.Println("Returning from aggregation")
 			return
 		}
-		for _, aggregated_measure := range mapMeasures {
+		for _, aggregated_measure := range m.AggregateMeasurePerNetflow {
 			if aggregated_measure.sampleCount == 0 {
 				continue
 			}
 			// send to persist measure sample
 			currentEpochMs := message.timestampMs + m.time_diff
 			sample := aggregated_measure.toDB_measure_packet(currentEpochMs)
-			sample.Uenum = m.session.Uenum
-			if m.session.ParentBenchmark.CsvOuptut {
+			sample.Uenum = m.Session.Uenum
+			if m.Session.ParentBenchmark.CsvOuptut {
 				if sample.Capacitykbits == 0 {
 					//this sometimes happens
 					//Everything in the sample is zero but the time
@@ -381,6 +398,8 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 				}
 			}
 			m.chan_to_persistence <- sample
+			// reset temporary sum fields
+			aggregated_measure.reset()
 		}
 	}
 }

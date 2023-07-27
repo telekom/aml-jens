@@ -56,12 +56,11 @@ type TrafficControlStartParams struct {
 type NftStartParams struct {
 	L4sPremarking bool
 	SignalStart   bool
-	Netflows      []string
 	Uenum         uint8
 }
 
 func (p NftStartParams) validate() error {
-	if len(p.Netflows) > MAX_UENUM {
+	if p.Uenum > MAX_UENUM {
 		return errortypes.NewUserInputError("naximum filter rules for ue/netflows = %d", MAX_UENUM)
 	}
 
@@ -121,7 +120,7 @@ type TrafficControl struct {
 	dev               string
 	current_data_rate float64
 	control_file      *os.File
-	nft               NftStartParams
+	Nft               NftStartParams
 }
 
 func NewTrafficControl(dev string) *TrafficControl {
@@ -164,9 +163,9 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 
 // Init sets NFT and TC to workable state, connects to custom qdisk.
 // After calling Init Close has to be called.
-func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft NftStartParams) error {
+func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft NftStartParams, Netflows []string) error {
 	ResetNFT(assets.NFT_TABLE_PREMARK)
-	tc.nft = nft
+	tc.Nft = nft
 
 	if nft.L4sPremarking {
 		err := CreateRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
@@ -174,12 +173,13 @@ func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft Nf
 			return err
 		}
 	}
-	// create nft mark rules for queue assignment
+	// create Nft mark rules for queue assignment
 	ResetNFT(assets.NFT_TABLE_UEMARK)
 	if err := nft.validate(); err != nil {
 		return err
 	}
-	err := CreateRulesMarkUe(tc.nft.Netflows)
+
+	err := CreateRulesMarkUe(Netflows)
 	if err != nil {
 		return err
 	}
@@ -213,13 +213,13 @@ func (tc *TrafficControl) Reset() error {
 // This function needs to be called after tc is Done.
 func (tc *TrafficControl) Close() error {
 	DEBUG.Println("Closing tc")
-	if tc.nft.L4sPremarking {
+	if tc.Nft.L4sPremarking {
 		ResetNFT(assets.NFT_TABLE_PREMARK)
 	}
-	if tc.nft.SignalStart {
+	if tc.Nft.SignalStart {
 		ResetNFT(assets.NFT_TABLE_SIGNAL)
 	}
-	if tc.nft.Uenum > 0 {
+	if tc.Nft.Uenum > 0 {
 		ResetNFT(assets.NFT_TABLE_UEMARK)
 	}
 
@@ -245,10 +245,10 @@ func (tc *TrafficControl) ChangeTo(rate float64) error {
 
 // Changes the current bandwidth limit to rate
 func (tc *TrafficControl) ChangeMultiTo(rate float64) error {
-	changeRateArray := make([]byte, 8*tc.nft.Uenum)
+	changeRateArray := make([]byte, 8*tc.Nft.Uenum)
 	currentDataRateBit := uint64(rate) * 1000
 	tc.current_data_rate = rate
-	for i := 0; i < int(tc.nft.Uenum); i++ {
+	for i := 0; i < int(tc.Nft.Uenum); i++ {
 		offset := i * 8
 		binary.LittleEndian.PutUint64(changeRateArray[offset:], currentDataRateBit)
 	}
@@ -265,7 +265,7 @@ func (tc *TrafficControl) ChangeMultiTo(rate float64) error {
 func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatypes.DB_data_rate_pattern, r util.RoutineReport) {
 	ticker := time.NewTicker(waitTime)
 	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
-	if tc.nft.SignalStart {
+	if tc.Nft.SignalStart {
 		go func() {
 			ResetNFT(assets.NFT_TABLE_SIGNAL)
 			err := CreateRuleECT(tc.dev, assets.NFT_TABLE_SIGNAL, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect0", "1")

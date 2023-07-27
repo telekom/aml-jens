@@ -72,6 +72,7 @@ func ArgParse() (err error) {
 		"tag",
 		time.Now().Format("2006.01.02 15:04:05"),
 		"tag of this measure session")
+	result.Name = multisession.Name
 	flag.BoolVar(
 		&looping,
 		"loop",

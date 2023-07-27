@@ -3,8 +3,10 @@ package drpplayer
 import "C"
 import (
 	"fmt"
+	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/config"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -17,8 +19,11 @@ import (
 )
 
 const MEASURE_FILE_MULTIJENS_PRAEFIX = "/sys/kernel/debug/sch_multijens/0001-"
+const MONITOR_NETFLOW_DURATION_S = 3
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
+
+var sessions []*measuresession.MeasureSession
 
 type DrpMultiPlayer struct {
 	multisession        *datatypes.DB_multi_session
@@ -96,24 +101,16 @@ func (s *DrpMultiPlayer) Start() error {
 		FATAL.Println(err)
 		os.Exit(1)
 	}
-	for i := 0; i < int(s.multisession.UenumTotal); i++ {
-		ueSession := *s.session
-		ueSession.Uenum = uint8(i)
-		ueSession.ParentMultisession = s.multisession
-
-		err = (*db).Persist(&ueSession)
-		if err != nil {
-			FATAL.Println(err)
-			os.Exit(1)
+	fixedUes := len(s.multisession.FixedNetflows)
+	for i := 0; i <= fixedUes; i++ {
+		netflowFilter := ""
+		if i > 0 {
+			netflowFilter = s.multisession.FixedNetflows[i-1]
 		}
-		// filename to read queue measures
-		suffix := fmt.Sprintf("0%d:0", i)
-		thisMeasureFilename := MEASURE_FILE_MULTIJENS_PRAEFIX + suffix
-		ms := measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename)
-		s.r.Wg.Add(1)
-		go ms.Start(s.r)
+		s.launchMeasureSession(i, db, netflowFilter, true)
 	}
 
+	// play drp
 	s.r.Wg.Add(1)
 	go s.tc.LaunchMultiChangeLoop(
 		time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
@@ -121,8 +118,119 @@ func (s *DrpMultiPlayer) Start() error {
 		s.r,
 	)
 
+	//monitor ue load, synchronize queues
+	s.r.Wg.Add(1)
+	go s.monitorTrafficPerUe(db, s.r)
+
 	return nil
 }
+
+func (s *DrpMultiPlayer) launchMeasureSession(i int, db *persistence.Persistence, netflowFilter string, fixedNetflow bool) {
+	ueSession := *s.session
+	ueSession.Uenum = uint8(i)
+	ueSession.NetflowFilter = netflowFilter
+	ueSession.ParentMultisession = s.multisession
+	ueSession.Name = ueSession.Name + "-UE" + strconv.Itoa(i)
+	err := (*db).Persist(&ueSession)
+	if err != nil {
+		FATAL.Println(err)
+		os.Exit(1)
+	}
+	// filename to read queue measures
+	suffix := fmt.Sprintf("0%d:0", i)
+	thisMeasureFilename := MEASURE_FILE_MULTIJENS_PRAEFIX + suffix
+	ms := measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename, fixedNetflow)
+	s.r.Wg.Add(1)
+	go ms.Start(s.r)
+
+	sessions = append(sessions, &ms)
+}
+
+func (s *DrpMultiPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.RoutineReport) {
+	sampleDuration := MONITOR_NETFLOW_DURATION_S * time.Second
+	monitoringTicker := time.NewTicker(sampleDuration)
+
+	// timer to monitor traffic per UE
+	for range monitoringTicker.C {
+		INFO.Printf("check ue netflows ...")
+		// remove non relevant UEs
+		INFO.Printf("remove ues without load...")
+		uesChanged := false
+		for i := 1; i < len(sessions); i++ {
+			ueSession := sessions[i]
+			if ueSession.FixedNetflow {
+				continue
+			}
+
+			var sumLoadBytes uint64 = 0
+			for _, aggregated_measure := range ueSession.AggregateMeasurePerNetflow {
+				sumLoadBytes += aggregated_measure.SumloadTotalBytes
+				aggregated_measure.SumloadTotalBytes = 0
+			}
+			INFO.Printf("ue%v netflow %v %v byte", ueSession.Session.Uenum, ueSession.Session.NetflowFilter, sumLoadBytes)
+			ueLoadKbits := sumLoadBytes / (125 * uint64(sampleDuration.Seconds()))
+			if ueLoadKbits < uint64(s.multisession.UeMinloadkbits) {
+				ueSession.Wg.Done()
+				sessions = append(sessions[:i], sessions[i+1:]...)
+				uesChanged = true
+				INFO.Printf("ue%v removed", ueSession.Session.Uenum)
+			}
+		}
+
+		// if traffic in ue0 relevant, launch neu UE
+		// get max load in netflow for ue 0
+		ue0Session := sessions[0]
+		var maxUe0LoadByte uint64 = 0
+		var newNetflow string
+		INFO.Printf("ue0")
+		for _, aggregated_measure := range ue0Session.AggregateMeasurePerNetflow {
+			if aggregated_measure.Net_flow.Source_port != 0 &&
+				aggregated_measure.Net_flow.Source_port != 22 &&
+				aggregated_measure.Net_flow.Destination_port != 0 &&
+				aggregated_measure.Net_flow.Destination_port != 22 {
+				INFO.Printf("netflow %v %v byte", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
+				if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
+					maxUe0LoadByte = aggregated_measure.SumloadTotalBytes
+					protocolType := aggregated_measure.Net_flow.TransportProtocoll
+					newNetflow = fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
+						aggregated_measure.Net_flow.Source_ip,
+						protocolType,
+						aggregated_measure.Net_flow.Source_port,
+						aggregated_measure.Net_flow.Destination_ip,
+						protocolType,
+						aggregated_measure.Net_flow.Destination_port)
+				}
+			}
+			aggregated_measure.SumloadTotalBytes = 0
+		}
+		// add netflow as ue, if relevant
+		INFO.Printf("add ue with relevant load...")
+		avgLoadKbits := maxUe0LoadByte / (125 * uint64(sampleDuration.Seconds()))
+		if avgLoadKbits > uint64(s.multisession.UeMinloadkbits) {
+			lastSessionIndex := len(sessions)
+			s.launchMeasureSession(lastSessionIndex, db, newNetflow, false)
+			uesChanged = true
+			INFO.Printf("ue%v netflow %v %v kbits added", lastSessionIndex, newNetflow, avgLoadKbits)
+		}
+
+		// reinstanciate marking rules
+		if uesChanged {
+			INFO.Printf("rebuild nft marking rules")
+			trafficcontrol.ResetNFT(assets.NFT_TABLE_UEMARK)
+			var netfilter []string
+			for _, session := range sessions {
+				if session.Session.NetflowFilter != "" {
+					netfilter = append(netfilter, session.Session.NetflowFilter)
+				}
+			}
+			err := trafficcontrol.CreateRulesMarkUe(netfilter)
+			if err != nil {
+				FATAL.Println(err)
+			}
+		}
+	}
+}
+
 func (s *DrpMultiPlayer) exit_clean() {
 	if err := s.tc.Close(); err != nil {
 		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
@@ -178,8 +286,9 @@ func (s *DrpMultiPlayer) initTC() error {
 		trafficcontrol.NftStartParams{
 			L4sPremarking: s.session.L4sEnablePreMarking,
 			SignalStart:   s.session.SignalDrpStart,
-			Netflows:      s.multisession.Netflows,
 			Uenum:         s.multisession.UenumTotal,
-		})
+		},
+		s.multisession.FixedNetflows,
+	)
 	return err
 }
