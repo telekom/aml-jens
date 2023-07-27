@@ -45,6 +45,8 @@ type DB_session struct {
 	//Non DB
 	SignalDrpStart bool
 	Uenum          uint8
+	NetflowFilter  string
+
 	// DB_Relations
 	ParentBenchmark    *DB_benchmark
 	ParentMultisession *DB_multi_session
@@ -75,8 +77,9 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 	qosmode,
 	l4sEnablePreMarking,
 	uenum,
+	netflow_filter,                         
     multisession_id
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING session_id`,
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING session_id`,
 		s.getBenchmarkId(),
 		s.Name,
 		s.Time,
@@ -88,6 +91,7 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 		s.Qosmode,
 		s.L4sEnablePreMarking,
 		s.Uenum,
+		s.NetflowFilter,
 		multisessionId).Scan(&s.Session_id)
 	return err
 }
