@@ -38,20 +38,16 @@ import (
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DataBase struct {
-	db                     *sql.DB
-	txMpMutex              sync.Mutex
-	txMP                   *sql.Tx
-	stmt_packet            *sql.Stmt
-	txMQ                   *sql.Tx
-	txMqMutex              sync.Mutex
-	stmt_queue             *sql.Stmt
-	stmt_sessionstats      *sql.Stmt
-	knownFlowsByMeasure_ID map[string]*datatypes.DB_network_flow
+	db                *sql.DB
+	txMpMutex         sync.Mutex
+	txMP              *sql.Tx
+	stmt_packet       *sql.Stmt
+	txMQ              *sql.Tx
+	txMqMutex         sync.Mutex
+	stmt_queue        *sql.Stmt
+	stmt_sessionstats *sql.Stmt
 }
 
-func (s *DataBase) ClearCache() {
-	s.knownFlowsByMeasure_ID = make(map[string]*datatypes.DB_network_flow)
-}
 func (s *DataBase) GetStmt() datatypes.SQLStmt {
 	return s.db
 }
@@ -68,7 +64,6 @@ func (s *DataBase) Close() error {
 	return nil
 }
 func (s *DataBase) Init(login *datatypes.Login) error {
-	s.knownFlowsByMeasure_ID = make(map[string]*datatypes.DB_network_flow)
 	if login != nil {
 		db, err := sql.Open("postgres", login.InfoStr())
 		if err != nil {
@@ -126,19 +121,8 @@ func (s *DataBase) GetSessionStats(session_id int) (int, int, int, error) {
 
 // var flow_id_cache map[string]
 func (s *DataBase) persist_flow(flow *datatypes.DB_network_flow) error {
-	flowInCache, keyExists := s.knownFlowsByMeasure_ID[flow.MeasureIdStr()]
-	if keyExists {
-		if flow.Prio != flowInCache.Prio {
-			flow.Update(s.db, flowInCache.Flow_id, flow.Prio)
-			flowInCache.Prio = flow.Prio
-		}
-		flow.Flow_id = flowInCache.Flow_id
-		return nil
-	} else {
-		err := flow.Sync(s.db)
-		s.knownFlowsByMeasure_ID[flow.MeasureIdStr()] = flow
-		return err
-	}
+	err := flow.Sync(s.db)
+	return err
 }
 func (s *DataBase) Persist(obj interface{}) error {
 	if !s.HasDBConnection() {
