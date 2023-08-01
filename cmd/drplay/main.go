@@ -151,6 +151,7 @@ func main() {
 		FATAL.Println(err)
 		os.Exit(4)
 	}
+
 	cfg := config.PlayCfg()
 	player := drplay.NewDrpPlayer(cfg)
 
@@ -161,7 +162,7 @@ func main() {
 		panic("A")
 		//return 255
 	}, 5000)
-	exithandler(player, player_has_ended)
+	//exithandler(player, player_has_ended)
 
 	err = player.Start()
 	if err != nil {
