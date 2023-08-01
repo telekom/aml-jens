@@ -134,9 +134,7 @@ func exithandler(player *drplay.DrpPlayer, exit chan uint8) {
 		case sig := <-exit_handler:
 			INFO.Printf("Received Signal: %d", sig)
 			player.Exit()
-
 		}
-
 	}()
 }
 
@@ -148,18 +146,13 @@ func main() {
 		FATAL.Println("Error during Argparse")
 		FATAL.Exit(err)
 	}
-	session := config.PlayCfg().A_Session
 	db, err := persistence.GetPersistence()
 	if err != nil {
 		FATAL.Println(err)
 		os.Exit(4)
 	}
-	err = (*db).Persist(session)
-	if err != nil {
-		FATAL.Println(err)
-		os.Exit(1)
-	}
-	player := drplay.NewDrpPlayer(session)
+	cfg := config.PlayCfg()
+	player := drplay.NewDrpPlayer(cfg)
 
 	//Todo should be done in caller, not callee
 	logging.LinkExitFunction(func() uint8 {
@@ -169,6 +162,7 @@ func main() {
 		//return 255
 	}, 5000)
 	exithandler(player, player_has_ended)
+
 	err = player.Start()
 	if err != nil {
 		FATAL.Println(err)

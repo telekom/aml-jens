@@ -40,7 +40,6 @@ import (
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-const JANZ_CTRL_FILE = "/sys/kernel/debug/sch_janz/0001:v1"
 const MULTIJENS_CTRL_FILE = "/sys/kernel/debug/sch_multijens/0001:v1"
 const MAX_UENUM = 16
 
@@ -132,37 +131,6 @@ func NewTrafficControl(dev string) *TrafficControl {
 
 // Init sets NFT and TC to workable state, connects to custom qdisk.
 // After calling Init Close has to be called.
-func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartParams) error {
-	ResetNFT(assets.NFT_TABLE_PREMARK)
-	if nft.L4sPremarking {
-		err := CreateRuleECT(tc.dev, assets.NFT_TABLE_PREMARK, assets.NFT_CHAIN_FORWARD, assets.NFT_CHAIN_OUTPUT, "ect1", "0")
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := params.validate(); err != nil {
-		return err
-	}
-	if err := tc.Reset(); true {
-		DEBUG.Printf("TcReset: %v", err)
-	}
-	args := []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "janz"}
-
-	args = append(args, params.asArgs()...)
-	time.Sleep(1 * time.Second)
-	DEBUG.Printf("Starting tc: %+v", args)
-	res := commands.ExecCommand("tc", args...)
-	if res.Error() != nil {
-		return res.Error()
-	}
-	var err error
-	tc.control_file, err = os.OpenFile(JANZ_CTRL_FILE, os.O_WRONLY, os.ModeAppend)
-	return err
-}
-
-// Init sets NFT and TC to workable state, connects to custom qdisk.
-// After calling Init Close has to be called.
 func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft NftStartParams, Netflows []string) error {
 	ResetNFT(assets.NFT_TABLE_PREMARK)
 	tc.Nft = nft
@@ -189,6 +157,10 @@ func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft Nf
 	}
 	if err := tc.Reset(); true {
 		DEBUG.Printf("TcReset: %v", err)
+	}
+	// min number of UEs is 2
+	if params.Uenum < 2 {
+		params.Uenum = 2
 	}
 	var args = []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "multijens", "uenum", strconv.FormatUint(uint64(params.Uenum), 10)}
 
