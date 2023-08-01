@@ -24,15 +24,14 @@ package assets
 import "log"
 
 const (
-	NAME_DRPLAY      = "DrPlay"
-	NAME_DRMULTIPLAY = "DrMultiPlay"
-	NAME_DRSHOW      = "DrShow"
-	NAME_DRBENCH     = "DrBenchmark"
-	LOG_PRE_DEBUG    = "[DEBUG] "
-	LOG_PRE_INFO     = "[INFO] "
-	LOG_PRE_WARN     = "[WARN] "
-	LOG_PRE_FATAL    = "[FATAL] "
-	LOG_SETTING      = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile | log.Lmsgprefix
+	NAME_DRPLAY   = "DrPlay"
+	NAME_DRSHOW   = "DrShow"
+	NAME_DRBENCH  = "DrBenchmark"
+	LOG_PRE_DEBUG = "[DEBUG] "
+	LOG_PRE_INFO  = "[INFO] "
+	LOG_PRE_WARN  = "[WARN] "
+	LOG_PRE_FATAL = "[FATAL] "
+	LOG_SETTING   = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile | log.Lmsgprefix
 )
 
 const (

@@ -27,7 +27,6 @@ copy-binaries:
 	@cp ${BIN_DIR}/drplay ${BUILD_DIR}/usr/bin/drplay
 	@cp ${BIN_DIR}/drshow ${BUILD_DIR}/usr/bin/drshow
 	@cp ${BIN_DIR}/drbenchmark ${BUILD_DIR}/usr/bin/drbenchmark
-	@cp ${BIN_DIR}/drmultiplay ${BUILD_DIR}/usr/bin/drmultiplay
 
 	
 clean:

@@ -207,7 +207,7 @@ func (b *Benchmark) play_session(db *persistence.Persistence, session_copy datat
 		return err, nil
 	}
 	v.Time = uint64(time.Now().UnixMilli())
-	b.player = drplay.NewDrpPlayer(v)
+	b.player = drplay.NewDrpPlayer(config.PlayCfg())
 	if err := b.player.Start(); err != nil {
 		return err, nil
 	}
