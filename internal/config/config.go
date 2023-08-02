@@ -63,6 +63,12 @@ func (c *config) readFromFile() error {
 		FixedNetflows:  viper.GetStringSlice("drplay.netflows"),
 		UeMinloadkbits: uint32(viper.GetInt("drplay.ueminloadkbits")),
 	}
+	// min number of UEs is 2
+	multisession.SingleQueue = false
+	if multisession.UenumTotal < 2 {
+		multisession.SingleQueue = true
+		multisession.UenumTotal = 2
+	}
 	asd := datatypes.DB_session{
 		//TC
 		Markfree:            viper.GetInt32("tccommands.markfree"),

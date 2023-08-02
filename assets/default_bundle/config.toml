@@ -29,7 +29,7 @@
                     "ip saddr 192.168.2.0/24 udp sport 22 ip daddr 192.168.0.1 udp dport 22", # UE1
                     "ip daddr 192.168.178.75", # UE2
                     "ip daddr 192.168.178.9" # UE3
-               		]
+       		]
   ueminloadkbits=1000
 
 [postgres]
