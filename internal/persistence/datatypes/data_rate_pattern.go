@@ -34,9 +34,8 @@ type DB_data_rate_pattern struct {
 	//Set when loading file
 	//
 	//Pk refrenced in session
-	Id        int
-	Freq      int
-	Nomeasure bool
+	Id   int
+	Freq int
 	//Non db-realted
 	dr_pattern   drp.DataRatePattern
 	WarmupTimeMs int32
