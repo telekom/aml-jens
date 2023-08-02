@@ -93,7 +93,7 @@ func ArgParse() (err error) {
 		"output measure records to configured postgresql db")
 
 	flag.BoolVar(
-		&result.ChildDRP.Nomeasure,
+		&result.Nomeasure,
 		"nomeasure",
 		false,
 		"only play drp, no queue measures are recorded")
