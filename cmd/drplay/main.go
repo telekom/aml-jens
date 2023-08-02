@@ -138,6 +138,19 @@ func exithandler(player *drplay.DrpPlayer, exit chan uint8) {
 	}()
 }
 
+func exitHandler(player *drplay.DrpPlayer) {
+	exit_handler := make(chan os.Signal)
+	signal.Notify(exit_handler, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT)
+	go func() {
+		sig := <-exit_handler
+		// Run Cleanup
+		INFO.Printf("Received Signal: %d\n", sig)
+		player.Exit_clean()
+		INFO.Printf("Resources resetted\n")
+		os.Exit(1)
+	}()
+}
+
 func main() {
 	logging.InitLogger(assets.NAME_DRPLAY)
 	INFO.Printf("===>Starting DrPlay @%s <===\n\n", time.Now().String())
@@ -162,7 +175,7 @@ func main() {
 		panic("A")
 		//return 255
 	}, 5000)
-	//exithandler(player, player_has_ended)
+	exitHandler(player)
 
 	err = player.Start()
 	if err != nil {

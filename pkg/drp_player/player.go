@@ -123,13 +123,14 @@ func (s *DrpPlayer) Start() error {
 	}
 
 	if !s.session.ChildDRP.Nomeasure {
-		fixedUes := len(s.multisession.FixedNetflows)
-		for i := 0; i <= fixedUes; i++ {
-			netflowFilter := ""
-			if i > 0 {
-				netflowFilter = s.multisession.FixedNetflows[i-1]
+		// launch default queue UE0
+		s.launchMeasureSession(0, db, "", true)
+		// launch queues for fixed UEs
+		if !s.multisession.SingleQueue {
+			for i := 1; i <= len(s.multisession.FixedNetflows); i++ {
+				netflowFilter := s.multisession.FixedNetflows[i-1]
+				s.launchMeasureSession(i, db, netflowFilter, true)
 			}
-			s.launchMeasureSession(i, db, netflowFilter, true)
 		}
 	}
 
@@ -142,7 +143,7 @@ func (s *DrpPlayer) Start() error {
 	)
 
 	//monitor ue load, synchronize queues
-	if s.multisession.UenumTotal > 1 {
+	if !s.multisession.SingleQueue {
 		s.r.Wg.Add(1)
 		go s.monitorTrafficPerUe(db, s.r)
 	}
@@ -204,38 +205,40 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 
 		// if traffic in ue0 relevant, launch neu UE
 		// get max load in netflow for ue 0
-		ue0Session := sessions[0]
-		var maxUe0LoadByte uint64 = 0
-		var newNetflow string
-		INFO.Printf("ue0")
-		for _, aggregated_measure := range ue0Session.AggregateMeasurePerNetflow {
-			if aggregated_measure.Net_flow.Source_port != 0 &&
-				aggregated_measure.Net_flow.Source_port != 22 &&
-				aggregated_measure.Net_flow.Destination_port != 0 &&
-				aggregated_measure.Net_flow.Destination_port != 22 {
-				INFO.Printf("netflow %v %v byte", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
-				if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
-					maxUe0LoadByte = aggregated_measure.SumloadTotalBytes
-					protocolType := aggregated_measure.Net_flow.TransportProtocoll
-					newNetflow = fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
-						aggregated_measure.Net_flow.Source_ip,
-						protocolType,
-						aggregated_measure.Net_flow.Source_port,
-						aggregated_measure.Net_flow.Destination_ip,
-						protocolType,
-						aggregated_measure.Net_flow.Destination_port)
+		if uint8(len(sessions)) < s.multisession.UenumTotal {
+			ue0Session := sessions[0]
+			var maxUe0LoadByte uint64 = 0
+			var newNetflow string
+			INFO.Printf("ue0")
+			for _, aggregated_measure := range ue0Session.AggregateMeasurePerNetflow {
+				if aggregated_measure.Net_flow.Source_port != 0 &&
+					aggregated_measure.Net_flow.Source_port != 22 &&
+					aggregated_measure.Net_flow.Destination_port != 0 &&
+					aggregated_measure.Net_flow.Destination_port != 22 {
+					INFO.Printf("netflow %v %v byte", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
+					if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
+						maxUe0LoadByte = aggregated_measure.SumloadTotalBytes
+						protocolType := aggregated_measure.Net_flow.TransportProtocoll
+						newNetflow = fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
+							aggregated_measure.Net_flow.Source_ip,
+							protocolType,
+							aggregated_measure.Net_flow.Source_port,
+							aggregated_measure.Net_flow.Destination_ip,
+							protocolType,
+							aggregated_measure.Net_flow.Destination_port)
+					}
 				}
+				aggregated_measure.SumloadTotalBytes = 0
 			}
-			aggregated_measure.SumloadTotalBytes = 0
-		}
-		// add netflow as ue, if relevant
-		INFO.Printf("add ue with relevant load...")
-		avgLoadKbits := maxUe0LoadByte / (125 * uint64(sampleDuration.Seconds()))
-		if avgLoadKbits > uint64(s.multisession.UeMinloadkbits) {
-			lastSessionIndex := len(sessions)
-			s.launchMeasureSession(lastSessionIndex, db, newNetflow, false)
-			uesChanged = true
-			INFO.Printf("ue%v netflow %v %v kbits added", lastSessionIndex, newNetflow, avgLoadKbits)
+			// add netflow as ue, if relevant
+			INFO.Printf("add ue with relevant load...")
+			avgLoadKbits := maxUe0LoadByte / (125 * uint64(sampleDuration.Seconds()))
+			if avgLoadKbits > uint64(s.multisession.UeMinloadkbits) {
+				lastSessionIndex := len(sessions)
+				s.launchMeasureSession(lastSessionIndex, db, newNetflow, false)
+				uesChanged = true
+				INFO.Printf("ue%v netflow %v %v kbits added", lastSessionIndex, newNetflow, avgLoadKbits)
+			}
 		}
 
 		// reinstanciate marking rules
@@ -256,7 +259,7 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 	}
 }
 
-func (s *DrpPlayer) exit_clean() {
+func (s *DrpPlayer) Exit_clean() {
 	if err := s.tc.Close(); err != nil {
 		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
 	}
@@ -270,7 +273,7 @@ func (s *DrpPlayer) exit_clean() {
 }
 func (s *DrpPlayer) Wait() {
 	s.r.Wg.Wait()
-	s.exit_clean()
+	s.Exit_clean()
 	DEBUG.Println("Player has exited")
 }
 func (s *DrpPlayer) close_channel() {
@@ -312,6 +315,7 @@ func (s *DrpPlayer) initTC() error {
 			L4sPremarking: s.session.L4sEnablePreMarking,
 			SignalStart:   s.session.SignalDrpStart,
 			Uenum:         s.multisession.UenumTotal,
+			SingleQueue:   s.multisession.SingleQueue,
 		},
 		s.multisession.FixedNetflows,
 	)
