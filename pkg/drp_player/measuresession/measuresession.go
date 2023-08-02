@@ -97,6 +97,7 @@ func (s *AggregateMeasure) reset() {
 	s.sumEcnNCE = 0
 	s.sumCapacityKbits = 0
 	s.sumSojournTimeMs = 0
+	s.sampleCount = 0
 	s.t_start = 0
 	s.t_end = 0
 }

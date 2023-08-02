@@ -122,7 +122,7 @@ func (s *DrpPlayer) Start() error {
 		os.Exit(1)
 	}
 
-	if !s.session.ChildDRP.Nomeasure {
+	if !s.session.Nomeasure {
 		// launch default queue UE0
 		s.launchMeasureSession(0, db, "", true)
 		// launch queues for fixed UEs
@@ -143,7 +143,7 @@ func (s *DrpPlayer) Start() error {
 	)
 
 	//monitor ue load, synchronize queues
-	if !s.multisession.SingleQueue {
+	if !s.multisession.SingleQueue && !s.session.Nomeasure {
 		s.r.Wg.Add(1)
 		go s.monitorTrafficPerUe(db, s.r)
 	}
@@ -263,7 +263,7 @@ func (s *DrpPlayer) Exit_clean() {
 	if err := s.tc.Close(); err != nil {
 		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
 	}
-	if !s.session.ChildDRP.Nomeasure {
+	if !s.session.Nomeasure {
 		p_ptr, err := persistence.GetPersistence()
 		if err != nil {
 			WARN.Printf("Exit: Could not get persistence %+v", err)
