@@ -211,22 +211,17 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 			var newNetflow string
 			INFO.Printf("ue0")
 			for _, aggregated_measure := range ue0Session.AggregateMeasurePerNetflow {
-				if aggregated_measure.Net_flow.Source_port != 0 &&
-					aggregated_measure.Net_flow.Source_port != 22 &&
-					aggregated_measure.Net_flow.Destination_port != 0 &&
-					aggregated_measure.Net_flow.Destination_port != 22 {
-					INFO.Printf("netflow %v %v byte", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
-					if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
-						maxUe0LoadByte = aggregated_measure.SumloadTotalBytes
-						protocolType := aggregated_measure.Net_flow.TransportProtocoll
-						newNetflow = fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
-							aggregated_measure.Net_flow.Source_ip,
-							protocolType,
-							aggregated_measure.Net_flow.Source_port,
-							aggregated_measure.Net_flow.Destination_ip,
-							protocolType,
-							aggregated_measure.Net_flow.Destination_port)
-					}
+				INFO.Printf("netflow %v %v byte", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
+				if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
+					maxUe0LoadByte = aggregated_measure.SumloadTotalBytes
+					protocolType := aggregated_measure.Net_flow.TransportProtocoll
+					newNetflow = fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
+						aggregated_measure.Net_flow.Source_ip,
+						protocolType,
+						aggregated_measure.Net_flow.Source_port,
+						aggregated_measure.Net_flow.Destination_ip,
+						protocolType,
+						aggregated_measure.Net_flow.Destination_port)
 				}
 				aggregated_measure.SumloadTotalBytes = 0
 			}
