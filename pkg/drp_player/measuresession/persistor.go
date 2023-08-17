@@ -163,12 +163,18 @@ func GetPersistence() *persistence.Persistence {
 //
 // Blocking, releases Wg
 func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error func(err error, lvl util.ErrorLevel), done func()) {
-	//Setup
+	// todo refactor persistence
 	var err error
-	s.db = GetPersistence()
+	persistenceInstance, err := persistence.GetPersistence()
+	if (*persistenceInstance).HasDBConnection() {
+		s.db = GetPersistence()
+	} else {
+		s.db = persistenceInstance
+	}
 	if err != nil {
 		report_error(fmt.Errorf("persistMeasures: %w", err), util.ErrWarn)
 	}
+
 	tickerPersist := time.NewTicker(s.persist_frequency)
 
 	for {

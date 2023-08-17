@@ -70,7 +70,7 @@ func (s *Database) Init(login *datatypes.Login) error {
 	return errors.New("no login supplied")
 }
 func (s *Database) HasDBConnection() bool {
-	return true
+	return false
 }
 func (s *Database) GetStmt() datatypes.SQLStmt {
 	return SQLStmtMock{}
