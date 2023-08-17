@@ -56,21 +56,29 @@ func ArgParse() (err error) {
 
 	pattern_path := flag.String(
 		"pattern",
-		"/etc/jens-cli/drp_3valleys.csv",
-		"csv file for data rate pattern (seperator enter, values in kbits)")
+		"",
+		"csv file for data rate pattern (seperator enter, values in kbits), e.g. /etc/jens-cli/drp_3valleys.csv")
 
+	var frequency int
 	flag.IntVar(
-		&result.ChildDRP.Freq,
+		&frequency,
 		"freq",
 		10,
 		"number of samples per second to play [1 ... 100], default 10")
-
+	result.ChildDRP.Freq = frequency
 	flag.StringVar(
 		&result.Name,
 		"tag",
 		time.Now().Format("2006.01.02 15:04:05"),
 		"tag of this measure session")
 	config.PlayCfg().A_MultiSession.Name = result.Name
+
+	var bandwidthkbits int
+	flag.IntVar(&bandwidthkbits,
+		"bandwidth",
+		0,
+		"total bandwidth in kbits")
+
 	flag.BoolVar(
 		&looping,
 		"loop",
@@ -82,11 +90,13 @@ func ArgParse() (err error) {
 		false,
 		"output measure records to csv file")
 
+	var scale float64
 	flag.Float64Var(
-		&result.ChildDRP.Initial_scale,
+		&scale,
 		"scale",
 		1,
 		"defines a scale factor which will be used to multiply the drp;  must be greater 0.1")
+	result.ChildDRP.Initial_scale = scale
 
 	postgresPtr := flag.Bool(
 		"psql",
@@ -100,6 +110,19 @@ func ArgParse() (err error) {
 		"only play drp, no queue measures are recorded")
 
 	flag.Parse()
+	drpExists := *pattern_path != "" || looping || scale != 1.0 || frequency != 10
+	if drpExists && bandwidthkbits != 0 {
+		logging.FlagParseExit("Eit" +
+			"her a data rate pattern (with -loop or -scale option) or a fixed bandwidth must be defined to limit capacity")
+	}
+	if *pattern_path == "" && bandwidthkbits == 0 {
+		*pattern_path = "/etc/jens-cli/drp_3valleys.csv"
+	}
+	if bandwidthkbits != 0 {
+		config.PlayCfg().A_MultiSession.Bandwidthkbits = bandwidthkbits
+		config.PlayCfg().A_MultiSession.DrpMode = false
+	}
+
 	if *version {
 		fmt.Printf("Version      : %s\n", assets.VERSION)
 		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
@@ -119,8 +142,10 @@ func ArgParse() (err error) {
 			return err
 		}
 	}
-	err = result.ChildDRP.ParseDRP(drp.NewDataRatePatternFileProvider(*pattern_path))
-	result.ChildDRP.SetLooping(looping)
+	if *pattern_path != "" {
+		err = result.ChildDRP.ParseDRP(drp.NewDataRatePatternFileProvider(*pattern_path))
+		result.ChildDRP.SetLooping(looping)
+	}
 	return err
 }
 

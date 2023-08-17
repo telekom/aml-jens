@@ -62,6 +62,7 @@ func (c *config) readFromFile() error {
 		UenumTotal:     uint8(viper.GetInt("drplay.uenum")),
 		FixedNetflows:  viper.GetStringSlice("drplay.netflows"),
 		UeMinloadkbits: uint32(viper.GetInt("drplay.ueminloadkbits")),
+		DrpMode:        true,
 	}
 	// min number of UEs is 2
 	multisession.SingleQueue = false

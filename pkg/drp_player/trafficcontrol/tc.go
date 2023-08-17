@@ -202,16 +202,6 @@ func (tc *TrafficControl) Close() error {
 }
 
 // Changes the current bandwidth limit to rate
-func (tc *TrafficControl) ChangeTo(rate float64) error {
-	changeRateArray := make([]byte, 8)
-	currentDataRateBit := uint64(rate) * 1000
-	tc.current_data_rate = rate
-	binary.LittleEndian.PutUint64(changeRateArray, currentDataRateBit)
-	_, err := tc.control_file.Write(changeRateArray)
-	return err
-}
-
-// Changes the current bandwidth limit to rate
 func (tc *TrafficControl) ChangeMultiTo(rate float64) error {
 	changeRateArray := make([]byte, 8*tc.Nft.Uenum)
 	currentDataRateBit := uint64(rate) * 1000
