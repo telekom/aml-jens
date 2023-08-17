@@ -97,13 +97,14 @@ func (s *DrpPlayer) Start() error {
 			return
 		}
 	}()
-
-	INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", s.session.ChildDRP.GetName(), s.session.Dev, s.session.ChildDRP.Freq, s.session.ChildDRP.IsLooping())
+	if s.multisession.DrpMode {
+		INFO.Printf("play data rate pattern %s on dev %s with %d samples/s in loop mode %t\n", s.session.ChildDRP.GetName(), s.session.Dev, s.session.ChildDRP.Freq, s.session.ChildDRP.IsLooping())
+	}
+	// create queues
 	if err := s.initTC(); err != nil {
 		return fmt.Errorf("initTC returned %w", err)
 	}
 
-	s.tc.ChangeTo(s.session.ChildDRP.Peek() * 1.33)
 	select {
 	case <-time.After(time.Millisecond * time.Duration(s.session.ChildDRP.WarmupTimeMs)):
 	case <-s.r.On_extern_exit_c:
@@ -134,13 +135,15 @@ func (s *DrpPlayer) Start() error {
 		}
 	}
 
-	// play drp
-	s.r.Wg.Add(1)
-	go s.tc.LaunchMultiChangeLoop(
-		time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
-		s.session.ChildDRP,
-		s.r,
-	)
+	if s.multisession.DrpMode {
+		// play drp
+		s.r.Wg.Add(1)
+		go s.tc.LaunchMultiChangeLoop(
+			time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
+			s.session.ChildDRP,
+			s.r,
+		)
+	}
 
 	//monitor ue load, synchronize queues
 	if !s.multisession.SingleQueue && !s.session.Nomeasure {
@@ -153,6 +156,7 @@ func (s *DrpPlayer) Start() error {
 
 func (s *DrpPlayer) launchMeasureSession(i int, db *persistence.Persistence, netflowFilter string, fixedNetflow bool) {
 	ueSession := *s.session
+	ueSession.Time = uint64(time.Now().UnixMilli())
 	ueSession.Uenum = uint8(i)
 	ueSession.NetflowFilter = netflowFilter
 	ueSession.ParentMultisession = s.multisession
@@ -178,9 +182,8 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 
 	// timer to monitor traffic per UE
 	for range monitoringTicker.C {
-		INFO.Printf("check ue netflows ...")
 		// remove non relevant UEs
-		INFO.Printf("remove ues without load...")
+		INFO.Printf("check for ues without load ...")
 		uesChanged := false
 		for i := 1; i < len(sessions); i++ {
 			ueSession := sessions[i]
@@ -193,13 +196,13 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 				sumLoadBytes += aggregated_measure.SumloadTotalBytes
 				aggregated_measure.SumloadTotalBytes = 0
 			}
-			INFO.Printf("ue%v netflow %v %v byte", ueSession.Session.Uenum, ueSession.Session.NetflowFilter, sumLoadBytes)
 			ueLoadKbits := sumLoadBytes / (125 * uint64(sampleDuration.Seconds()))
+			INFO.Printf("ue%v netflow %v %v loadKbits", ueSession.Session.Uenum, ueSession.Session.NetflowFilter, ueLoadKbits)
 			if ueLoadKbits < uint64(s.multisession.UeMinloadkbits) {
 				ueSession.Wg.Done()
 				sessions = append(sessions[:i], sessions[i+1:]...)
 				uesChanged = true
-				INFO.Printf("ue%v removed", ueSession.Session.Uenum)
+				INFO.Printf("ue %v removed", ueSession.Session.Uenum)
 			}
 		}
 
@@ -209,7 +212,7 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 			ue0Session := sessions[0]
 			var maxUe0LoadByte uint64 = 0
 			var newNetflow string
-			INFO.Printf("ue0")
+			INFO.Printf("check default queue ue0 for new UEs ...")
 			for _, aggregated_measure := range ue0Session.AggregateMeasurePerNetflow {
 				INFO.Printf("netflow %v %v byte", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
 				if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
@@ -249,6 +252,16 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 			err := trafficcontrol.CreateRulesMarkUe(netfilter)
 			if err != nil {
 				FATAL.Println(err)
+			}
+			if !s.multisession.DrpMode {
+				// adjust bandwidth per UE
+				bandwidthPerUE := float64(s.multisession.Bandwidthkbits / len(sessions))
+				//change data rate in control file
+				if err := s.tc.ChangeMultiTo(bandwidthPerUE); err != nil {
+					r.ReportFatal(fmt.Errorf("monitorTrafficPerUe could not change value: %w", err))
+					r.Wg.Done()
+					return
+				}
 			}
 		}
 	}
@@ -295,8 +308,14 @@ func (s *DrpPlayer) Exit() {
 }
 func (s *DrpPlayer) initTC() error {
 	s.tc = trafficcontrol.NewTrafficControl(s.session.Dev)
+	var initialDatarateKbits float64
+	if s.multisession.DrpMode {
+		initialDatarateKbits = float64(s.session.ChildDRP.Peek() * 1.33)
+	} else {
+		initialDatarateKbits = float64(s.multisession.Bandwidthkbits / (len(s.multisession.FixedNetflows) + 1))
+	}
 	settings := trafficcontrol.TrafficControlStartParams{
-		Datarate:     uint32(s.session.ChildDRP.Peek() * 2),
+		Datarate:     uint32(initialDatarateKbits),
 		QueueSize:    int(s.session.Queuesizepackets),
 		AddonLatency: int(s.session.ExtralatencyMs),
 		Markfree:     int(s.session.Markfree),

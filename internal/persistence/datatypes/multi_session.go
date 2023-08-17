@@ -26,7 +26,9 @@ type DB_multi_session struct {
 	Name            string
 	UenumTotal      uint8
 	SingleQueue     bool
+	DrpMode         bool
 	FixedNetflows   []string
+	Bandwidthkbits  int
 	UeMinloadkbits  uint32
 }
 
