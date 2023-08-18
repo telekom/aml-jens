@@ -65,23 +65,35 @@ func (s *DataBase) Close() error {
 }
 func (s *DataBase) Init(login *datatypes.Login) error {
 	if login != nil {
-		db, err := sql.Open("postgres", login.InfoStr())
-		if err != nil {
-			return fmt.Errorf("could not establish connection to DB: %s", err)
-		}
-		err = db.Ping()
-		if err != nil {
+		if s.db == nil {
+			db, err := sql.Open("postgres", login.InfoStr())
+			if err != nil {
+				return fmt.Errorf("could not establish connection to DB: %s", err)
+			}
+			err = db.Ping()
+			if err != nil {
+				return err
+			}
+			s.db = db
+			if err != nil {
+				return err
+			}
 			return err
 		}
-		s.db = db
-		if err != nil {
-			return err
-		}
+	}
+	return nil
+}
+
+func (s *DataBase) InitTransactions() error {
+	var err error
+	if s.db != nil {
 		if err = s.prep_bulk_stmts(); err != nil {
 			return err
 		}
 		err = s.prep_special_stmts()
 		return err
+	} else {
+		return fmt.Errorf("could not create transactions and prepared statements: %s", err)
 	}
 	return nil
 }
