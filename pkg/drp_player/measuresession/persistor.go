@@ -3,8 +3,6 @@ package measuresession
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/telekom/aml-jens/internal/config"
-	"github.com/telekom/aml-jens/internal/persistence/psql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,28 +150,17 @@ func (s *MeasureSessionPersistor) persist(sample interface{}) error {
 	return nil
 }
 
-func GetPersistence() *persistence.Persistence {
-	db := &psql.DataBase{}
-	db.Init(&config.PlayCfg().Psql)
-	var persistence persistence.Persistence = db
-	return &persistence
-}
-
 // Stars Loop, which persits any samples coming in through the samples channel
 //
 // Blocking, releases Wg
 func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error func(err error, lvl util.ErrorLevel), done func()) {
 	// todo refactor persistence
 	var err error
-	persistenceInstance, err := persistence.GetPersistence()
-	if (*persistenceInstance).HasDBConnection() {
-		s.db = GetPersistence()
-	} else {
-		s.db = persistenceInstance
-	}
+	s.db, err = persistence.GetPersistence()
 	if err != nil {
 		report_error(fmt.Errorf("persistMeasures: %w", err), util.ErrWarn)
 	}
+	(*s.db).InitTransactions()
 
 	tickerPersist := time.NewTicker(s.persist_frequency)
 

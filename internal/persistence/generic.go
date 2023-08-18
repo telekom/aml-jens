@@ -33,6 +33,7 @@ var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type Persistence interface {
 	Init(login *datatypes.Login) error
+	InitTransactions() error
 	Close() error
 	GetSessionStats(session_id int) (load int, start int, end int, err error)
 	Persist(obj interface{}) error
