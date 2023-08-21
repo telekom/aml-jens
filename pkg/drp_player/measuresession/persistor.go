@@ -3,7 +3,6 @@ package measuresession
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/telekom/aml-jens/internal/config"
 	"github.com/telekom/aml-jens/internal/persistence/psql"
 	"os"
 	"path/filepath"
@@ -152,9 +151,10 @@ func (s *MeasureSessionPersistor) persist(sample interface{}) error {
 	return nil
 }
 
-func GetPersistence() *persistence.Persistence {
+func GetPersistence(existingPersistence *persistence.Persistence) *persistence.Persistence {
 	db := &psql.DataBase{}
-	db.Init(&config.PlayCfg().Psql)
+	db.Db = (*existingPersistence).(*psql.DataBase).Db
+	db.InitTransactions()
 	var persistence persistence.Persistence = db
 	return &persistence
 }
@@ -167,7 +167,7 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 	var err error
 	persistenceInstance, err := persistence.GetPersistence()
 	if (*persistenceInstance).HasDBConnection() {
-		s.db = GetPersistence()
+		s.db = GetPersistence(persistenceInstance)
 	} else {
 		s.db = persistenceInstance
 	}

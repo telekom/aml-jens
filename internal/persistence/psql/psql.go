@@ -38,7 +38,7 @@ import (
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DataBase struct {
-	db                *sql.DB
+	Db                *sql.DB
 	txMpMutex         sync.Mutex
 	txMP              *sql.Tx
 	stmt_packet       *sql.Stmt
@@ -49,17 +49,17 @@ type DataBase struct {
 }
 
 func (s *DataBase) GetStmt() datatypes.SQLStmt {
-	return s.db
+	return s.Db
 }
 
 //go:inline
 func (s *DataBase) HasDBConnection() bool {
-	return s.db != nil
+	return s.Db != nil
 }
 func (s *DataBase) Close() error {
 	DEBUG.Println("Closing DB")
 	if !s.HasDBConnection() {
-		return s.db.Close()
+		return s.Db.Close()
 	}
 	return nil
 }
@@ -73,7 +73,7 @@ func (s *DataBase) Init(login *datatypes.Login) error {
 		if err != nil {
 			return err
 		}
-		s.db = db
+		s.Db = db
 		if err != nil {
 			return err
 		}
@@ -86,12 +86,21 @@ func (s *DataBase) Init(login *datatypes.Login) error {
 	return nil
 }
 
+func (s *DataBase) InitTransactions() error {
+	var result error
+	if result = s.prep_bulk_stmts(); result != nil {
+		return result
+	}
+	result = s.prep_special_stmts()
+	return result
+}
+
 func (s *DataBase) prep_bulk_stmts() (err error) {
-	s.txMQ, err = s.db.Begin()
+	s.txMQ, err = s.Db.Begin()
 	if err != nil {
 		return err
 	}
-	s.txMP, err = s.db.Begin()
+	s.txMP, err = s.Db.Begin()
 	if err != nil {
 		return err
 	}
@@ -104,7 +113,7 @@ func (s *DataBase) prep_bulk_stmts() (err error) {
 }
 
 func (s *DataBase) prep_special_stmts() (err error) {
-	s.stmt_sessionstats, err = s.db.Prepare(`
+	s.stmt_sessionstats, err = s.Db.Prepare(`
 		select COALESCE(MAX(loadkbits),-1) as load, COALESCE(MIN(time),0) as start, COALESCE(MAX(TIME),1) as end from measure_packet
 		where fk_flow_id IN (SELECT flow_id from network_flow where session_id=$1) LIMIT 1;
 		`)
@@ -121,12 +130,12 @@ func (s *DataBase) GetSessionStats(session_id int) (int, int, int, error) {
 
 // var flow_id_cache map[string]
 func (s *DataBase) persist_flow(flow *datatypes.DB_network_flow) error {
-	err := flow.Sync(s.db)
+	err := flow.Sync(s.Db)
 	return err
 }
 func (s *DataBase) Persist(obj interface{}) error {
 	if !s.HasDBConnection() {
-		return errors.New("no connection to db")
+		return errors.New("no connection to Db")
 	}
 	switch v := obj.(type) {
 	case datatypes.DB_measure_packet:
@@ -141,7 +150,7 @@ func (s *DataBase) Persist(obj interface{}) error {
 	case persistence.DumbPersistable:
 		//Catch for benchmark, data_rate_pattern
 		DEBUG.Printf("{interface {persistence.DumbPersistable}} --> %v", reflect.TypeOf(v))
-		return v.Insert(s.db)
+		return v.Insert(s.Db)
 	default:
 		WARN.Printf("unknown Obj-Type: %v (%+v)", reflect.TypeOf(obj), obj)
 		return nil
@@ -187,39 +196,39 @@ func (s *DataBase) Commit() {
 	//DEBUG.Println("Committing txMQ")
 	if err := s.txMQ.Commit(); err != nil {
 		FATAL.Println(err)
-		FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
+		FATAL.Exit("Could not commit transaction of measure_queue: check logs / Db")
 	}
-	s.txMQ, err = s.db.Begin()
+	s.txMQ, err = s.Db.Begin()
 	if err != nil {
 		FATAL.Println(err)
-		FATAL.Exit("Could not create transaction of measure_queue: check logs / db")
+		FATAL.Exit("Could not create transaction of measure_queue: check logs / Db")
 	}
 	s.stmt_queue, err = s.txMQ.Prepare(datatypes.DB_measure_queue{}.GetSQLStatement())
 	s.txMqMutex.Unlock()
 	if err != nil {
 		FATAL.Println(err)
-		FATAL.Exit("Could not prepare preparedstatments of measure_queue: check logs / db")
+		FATAL.Exit("Could not prepare preparedstatments of measure_queue: check logs / Db")
 	}
 	s.txMpMutex.Lock()
 	//DEBUG.Println("Committing txMP")
 	if err := s.txMP.Commit(); err != nil {
 		FATAL.Println(err)
-		FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
+		FATAL.Exit("Could not commit transaction of measure_queue: check logs / Db")
 	}
-	s.txMP, err = s.db.Begin()
+	s.txMP, err = s.Db.Begin()
 	if err != nil {
 		FATAL.Println(err)
-		FATAL.Exit("Could not create transaction of measure_packet: check logs / db")
+		FATAL.Exit("Could not create transaction of measure_packet: check logs / Db")
 	}
 	s.stmt_packet, err = s.txMP.Prepare(datatypes.DB_measure_packet{}.GetSQLStatement())
 	s.txMpMutex.Unlock()
 	if err != nil {
 		FATAL.Println(err)
-		FATAL.Exit("Could not prepare preparedstatments of measure_packet: check logs / db")
+		FATAL.Exit("Could not prepare preparedstatments of measure_packet: check logs / Db")
 	}
 }
 
 //go:inline
 func (s *DataBase) ValidateUniqueName(obj persistence.PersistbleWithUniqueName) error {
-	return obj.ValidateUniqueName(s.db)
+	return obj.ValidateUniqueName(s.Db)
 }

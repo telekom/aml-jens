@@ -69,6 +69,11 @@ func (s *Database) Init(login *datatypes.Login) error {
 	}
 	return errors.New("no login supplied")
 }
+
+func (s *Database) InitTransactions() error {
+	return nil
+}
+
 func (s *Database) HasDBConnection() bool {
 	return false
 }
