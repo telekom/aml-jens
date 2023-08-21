@@ -65,34 +65,37 @@ func (s *DataBase) Close() error {
 }
 func (s *DataBase) Init(login *datatypes.Login) error {
 	if login != nil {
-		db, err := sql.Open("postgres", login.InfoStr())
-		if err != nil {
-			return fmt.Errorf("could not establish connection to DB: %s", err)
-		}
-		err = db.Ping()
-		if err != nil {
+		if s.Db == nil {
+			db, err := sql.Open("postgres", login.InfoStr())
+			if err != nil {
+				return fmt.Errorf("could not establish connection to DB: %s", err)
+			}
+			err = db.Ping()
+			if err != nil {
+				return err
+			}
+			s.Db = db
+			if err != nil {
+				return err
+			}
 			return err
 		}
-		s.Db = db
-		if err != nil {
-			return err
-		}
-		if err = s.prep_bulk_stmts(); err != nil {
-			return err
-		}
-		err = s.prep_special_stmts()
-		return err
 	}
 	return nil
 }
 
 func (s *DataBase) InitTransactions() error {
-	var result error
-	if result = s.prep_bulk_stmts(); result != nil {
-		return result
+	var err error
+	if s.Db != nil {
+		if err = s.prep_bulk_stmts(); err != nil {
+			return err
+		}
+		err = s.prep_special_stmts()
+		return err
+	} else {
+		return fmt.Errorf("could not create transactions and prepared statements: %s", err)
 	}
-	result = s.prep_special_stmts()
-	return result
+	return nil
 }
 
 func (s *DataBase) prep_bulk_stmts() (err error) {
