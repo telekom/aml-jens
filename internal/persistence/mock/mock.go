@@ -23,11 +23,10 @@ package mock
 
 import (
 	"errors"
-	"time"
-
 	"github.com/telekom/aml-jens/internal/logging"
 	"github.com/telekom/aml-jens/internal/persistence"
 	"github.com/telekom/aml-jens/internal/persistence/datatypes"
+	"time"
 )
 
 var DEBUG, _, _, _ = logging.GetLogger()
@@ -69,10 +68,13 @@ func (s *Database) Init(login *datatypes.Login) error {
 	}
 	return errors.New("no login supplied")
 }
-func (s *Database) InitTransactions() error {
-	s.print("Init transactions")
-	return nil
+func (s *Database) GetNewInstance() (*persistence.Persistence, error) {
+	s.print("Mock GetNewInstance")
+	db := &Database{}
+	var persistence persistence.Persistence = db
+	return &persistence, nil
 }
+
 func (s *Database) HasDBConnection() bool {
 	return false
 }
