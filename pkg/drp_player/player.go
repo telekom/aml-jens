@@ -271,13 +271,6 @@ func (s *DrpPlayer) Exit_clean() {
 	if err := s.tc.Close(); err != nil {
 		WARN.Printf("Exit: error closing TrafficControl: %+v", err)
 	}
-	if !s.session.Nomeasure {
-		p_ptr, err := persistence.GetPersistence()
-		if err != nil {
-			WARN.Printf("Exit: Could not get persistence %+v", err)
-		}
-		(*p_ptr).Commit()
-	}
 }
 func (s *DrpPlayer) Wait() {
 	s.r.Wg.Wait()

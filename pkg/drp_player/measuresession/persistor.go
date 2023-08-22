@@ -3,7 +3,6 @@ package measuresession
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/telekom/aml-jens/internal/config"
 	"github.com/telekom/aml-jens/internal/persistence/psql"
 	"os"
 	"path/filepath"
