@@ -84,7 +84,15 @@ func (s *DataBase) Init(login *datatypes.Login) error {
 	return nil
 }
 
-func (s *DataBase) InitTransactions() error {
+func (s *DataBase) GetNewInstance() (*persistence.Persistence, error) {
+	db := &DataBase{}
+	db.Db = (*s).Db
+	error := db.initTransactions()
+	var persistence persistence.Persistence = db
+	return &persistence, error
+}
+
+func (s *DataBase) initTransactions() error {
 	var err error
 	if s.Db != nil {
 		if err = s.prep_bulk_stmts(); err != nil {
