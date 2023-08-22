@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -73,11 +74,11 @@ func ArgParse() (err error) {
 		"tag of this measure session")
 	config.PlayCfg().A_MultiSession.Name = result.Name
 
-	var bandwidthkbits int
-	flag.IntVar(&bandwidthkbits,
+	var bandwidthInUnit string
+	flag.StringVar(&bandwidthInUnit,
 		"bandwidth",
-		0,
-		"total bandwidth in kbits")
+		"",
+		"total bandwidth in unit m(mbits) or k(kbits)")
 
 	flag.BoolVar(
 		&looping,
@@ -110,10 +111,24 @@ func ArgParse() (err error) {
 		"only play drp, no queue measures are recorded")
 
 	flag.Parse()
+
+	var bandwidthkbits int = 0
+	if bandwidthInUnit != "" {
+		unit := strings.ToLower(bandwidthInUnit[len(bandwidthInUnit)-1:])
+		bandwidthkbits, err = strconv.Atoi(bandwidthInUnit[:len(bandwidthInUnit)-1])
+		if err != nil {
+			logging.FlagParseExit("specified bandwidth is not a number")
+		}
+		if unit == "m" {
+			bandwidthkbits *= 1000
+		} else if unit != "k" {
+			logging.FlagParseExit("specified bandwidth must be in unit m(mbits) or k(kbits), e.g. 20000k")
+		}
+	}
+
 	drpExists := *pattern_path != "" || looping || scale != 1.0 || frequency != 10
 	if drpExists && bandwidthkbits != 0 {
-		logging.FlagParseExit("Eit" +
-			"her a data rate pattern (with -loop or -scale option) or a fixed bandwidth must be defined to limit capacity")
+		logging.FlagParseExit("Either a data rate pattern (with -loop or -scale option) or a fixed bandwidth must be defined to limit capacity")
 	}
 	if *pattern_path == "" && bandwidthkbits == 0 {
 		*pattern_path = "/etc/jens-cli/drp_3valleys.csv"
