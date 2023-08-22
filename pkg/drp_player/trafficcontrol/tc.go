@@ -28,9 +28,6 @@ import (
 
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/commands"
-	"github.com/telekom/aml-jens/internal/persistence/datatypes"
-	"github.com/telekom/aml-jens/internal/util"
-
 	"os"
 	"time"
 
@@ -212,42 +209,4 @@ func (tc *TrafficControl) ChangeMultiTo(rate float64) error {
 	}
 	_, err := tc.control_file.Write(changeRateArray)
 	return err
-}
-
-// Starts a goroutine that will change the current capacity restricitons.
-// A change will occur after the waitTime is exceeded.
-//
-// # Uses util.RoutineReport
-//
-// Blockig - also spawns 1 short lived routine
-func (tc *TrafficControl) LaunchMultiChangeLoop(waitTime time.Duration, drp *datatypes.DB_data_rate_pattern, r util.RoutineReport) {
-	ticker := time.NewTicker(waitTime)
-	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
-	for {
-		select {
-		case <-r.On_extern_exit_c:
-			DEBUG.Println("Closing TC-loop")
-			r.Wg.Done()
-			return
-		case <-ticker.C:
-			value, err := drp.Next()
-			if err != nil {
-				if _, ok := err.(*errortypes.IterableStopError); ok {
-					r.Application_has_finished <- "DataRatePattern has finished"
-					r.Wg.Done()
-					return
-				} else {
-					r.ReportWarn(fmt.Errorf("LaunchChangeLoop could retrieve next Value: %w", err))
-					r.Wg.Done()
-					return
-				}
-			}
-			//change data rate in control file
-			if err := tc.ChangeMultiTo(value); err != nil {
-				r.ReportFatal(fmt.Errorf("LaunchChangeLoop could not change value: %w", err))
-				r.Wg.Done()
-				return
-			}
-		}
-	}
 }

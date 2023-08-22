@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/config"
+	"github.com/telekom/aml-jens/internal/errortypes"
 	"os"
 	"strconv"
 	"sync"
@@ -53,6 +54,48 @@ func NewDrpPlayer(config *config.DrPlayConfig) *DrpPlayer {
 		close_channel_mutex: &close_channel_mutex,
 	}
 	return d
+}
+
+// Starts a goroutine that will change the current capacity restricitons.
+// A change will occur after the waitTime is exceeded.
+//
+// # Uses util.RoutineReport
+//
+// Blockig - also spawns 1 short lived routine
+func (s *DrpPlayer) launchMultiChangeLoop(waitTime time.Duration, drp *datatypes.DB_data_rate_pattern, r util.RoutineReport, shareCapacityResources bool) {
+	ticker := time.NewTicker(waitTime)
+	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
+	for {
+		select {
+		case <-r.On_extern_exit_c:
+			DEBUG.Println("Closing TC-loop")
+			r.Wg.Done()
+			return
+		case <-ticker.C:
+			value, err := drp.Next()
+			numberOfActiveUes := len(sessions)
+			if numberOfActiveUes > 1 && shareCapacityResources {
+				value /= float64(numberOfActiveUes)
+			}
+			if err != nil {
+				if _, ok := err.(*errortypes.IterableStopError); ok {
+					r.Application_has_finished <- "DataRatePattern has finished"
+					r.Wg.Done()
+					return
+				} else {
+					r.ReportWarn(fmt.Errorf("LaunchChangeLoop could retrieve next Value: %w", err))
+					r.Wg.Done()
+					return
+				}
+			}
+			//change data rate in control file
+			if err := s.tc.ChangeMultiTo(value); err != nil {
+				r.ReportFatal(fmt.Errorf("LaunchChangeLoop could not change value: %w", err))
+				r.Wg.Done()
+				return
+			}
+		}
+	}
 }
 
 // Starts every component needed for the operation of Drplayer
@@ -138,17 +181,18 @@ func (s *DrpPlayer) Start() error {
 	if s.multisession.DrpMode {
 		// play drp
 		s.r.Wg.Add(1)
-		go s.tc.LaunchMultiChangeLoop(
+		go s.launchMultiChangeLoop(
 			time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
 			s.session.ChildDRP,
 			s.r,
+			s.multisession.ShareCapacityResources,
 		)
 	}
 
 	//monitor ue load, synchronize queues
 	if !s.multisession.SingleQueue && !s.session.Nomeasure {
 		s.r.Wg.Add(1)
-		go s.monitorTrafficPerUe(db, s.r)
+		go s.monitorTrafficPerUe(db, s.r, s.multisession.ShareCapacityResources)
 	}
 
 	return nil
@@ -176,7 +220,7 @@ func (s *DrpPlayer) launchMeasureSession(i int, db *persistence.Persistence, net
 	sessions = append(sessions, &ms)
 }
 
-func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.RoutineReport) {
+func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.RoutineReport, shareCapacityResources bool) {
 	sampleDuration := MONITOR_NETFLOW_DURATION_S * time.Second
 	monitoringTicker := time.NewTicker(sampleDuration)
 
@@ -255,7 +299,10 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 			}
 			if !s.multisession.DrpMode {
 				// adjust bandwidth per UE
-				bandwidthPerUE := float64(s.multisession.Bandwidthkbits / len(sessions))
+				bandwidthPerUE := float64(s.multisession.Bandwidthkbits)
+				if len(sessions) > 1 && shareCapacityResources {
+					bandwidthPerUE /= float64(len(sessions))
+				}
 				//change data rate in control file
 				if err := s.tc.ChangeMultiTo(bandwidthPerUE); err != nil {
 					r.ReportFatal(fmt.Errorf("monitorTrafficPerUe could not change value: %w", err))
@@ -305,7 +352,11 @@ func (s *DrpPlayer) initTC() error {
 	if s.multisession.DrpMode {
 		initialDatarateKbits = float64(s.session.ChildDRP.Peek() * 1.33)
 	} else {
-		initialDatarateKbits = float64(s.multisession.Bandwidthkbits / (len(s.multisession.FixedNetflows) + 1))
+		initialDatarateKbits = float64(s.multisession.Bandwidthkbits)
+		initNumberOfUes := len(s.multisession.FixedNetflows) + 1
+		if s.multisession.ShareCapacityResources && initNumberOfUes > 1 {
+			initialDatarateKbits /= float64(initNumberOfUes)
+		}
 	}
 	settings := trafficcontrol.TrafficControlStartParams{
 		Datarate:     uint32(initialDatarateKbits),
