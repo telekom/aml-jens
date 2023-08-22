@@ -22,14 +22,15 @@
 package datatypes
 
 type DB_multi_session struct {
-	Multisession_id int
-	Name            string
-	UenumTotal      uint8
-	SingleQueue     bool
-	DrpMode         bool
-	FixedNetflows   []string
-	Bandwidthkbits  int
-	UeMinloadkbits  uint32
+	Multisession_id        int
+	Name                   string
+	UenumTotal             uint8
+	SingleQueue            bool
+	DrpMode                bool
+	FixedNetflows          []string
+	Bandwidthkbits         int
+	UeMinloadkbits         uint32
+	ShareCapacityResources bool
 }
 
 // Executes a sqlstmt to Insert this session into DB

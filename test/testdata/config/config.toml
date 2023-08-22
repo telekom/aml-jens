@@ -29,7 +29,9 @@
                         "ip daddr 192.168.178.75", # UE2
                         "ip daddr 192.168.178.9" # UE3
                    		]
-
+      # true: the available capacity (from data rate pattern or bandwidth) is divided by the number of UEs/active Queues
+      # false: use capacity (from data rate pattern or bandwidth) as specified for each UE
+      sharecapacityresources=true
 	[drshow]
 	  scalePlots=true #instead of scrolling
 	  exportPath="/tmp"

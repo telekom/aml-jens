@@ -59,10 +59,11 @@ func (c *config) readFromFile() error {
 	drp.Freq = -1
 	drp.Initial_scale = -1
 	multisession := datatypes.DB_multi_session{
-		UenumTotal:     uint8(viper.GetInt("drplay.uenum")),
-		FixedNetflows:  viper.GetStringSlice("drplay.netflows"),
-		UeMinloadkbits: uint32(viper.GetInt("drplay.ueminloadkbits")),
-		DrpMode:        true,
+		UenumTotal:             uint8(viper.GetInt("drplay.uenum")),
+		FixedNetflows:          viper.GetStringSlice("drplay.netflows"),
+		UeMinloadkbits:         uint32(viper.GetInt("drplay.ueminloadkbits")),
+		DrpMode:                true,
+		ShareCapacityResources: viper.GetBool("drplay.sharecapacityresources"),
 	}
 	// min number of UEs is 2
 	multisession.SingleQueue = false
