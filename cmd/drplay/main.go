@@ -66,7 +66,6 @@ func ArgParse() (err error) {
 		"freq",
 		10,
 		"number of samples per second to play [1 ... 100], default 10")
-	result.ChildDRP.Freq = frequency
 	flag.StringVar(
 		&result.Name,
 		"tag",
@@ -111,6 +110,7 @@ func ArgParse() (err error) {
 		"only play drp, no queue measures are recorded")
 
 	flag.Parse()
+	result.ChildDRP.Freq = frequency
 
 	var bandwidthkbits int = 0
 	if bandwidthInUnit != "" {
