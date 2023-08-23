@@ -139,10 +139,6 @@ func (tc *TrafficControl) InitMultijens(params TrafficControlStartParams, nft Nf
 	}
 	//create nft marking filter for UEs
 	if !nft.SingleQueue {
-		numberOfFilters := len(Netflows)
-		if uint8(numberOfFilters) > (nft.Uenum - 1) {
-			return errortypes.NewUserInputError("number of netflow rules %d must not exceed number of UEs %d (exclusive default UE0)", numberOfFilters, nft.Uenum-1)
-		}
 		err = CreateRulesMarkUe(Netflows)
 		if err != nil {
 			return err

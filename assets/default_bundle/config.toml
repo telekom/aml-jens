@@ -20,7 +20,7 @@
   # value 1 : All traffic in uplink direction of the specified network interface is handled in one queue
   # value > 1 : Explicte netflows can be defined below to identify specific UE traffic, which should be handled in a sperate queue.
   #             If a netflow (src-ip:port->dest-ip:port) is not filtered by the netflows rules, it is routed through
-  #             a common queue as UE0. But it is assigned to a seperate queue automatically, as long as its load exceeds ueminloadkbits.
+  #             the common default queue UE0. But it is assigned to a seperate queue automatically, as long as its load exceeds ueminloadkbits.
   uenum=16
   # Define a netflow for each UE in your test setup you want to handle in a separate network quueue, the syntax of the filter is in nft syntax.
   # By this, corresponding nft rules are defined. If your application uses custom traffic filter/marking rules (iptables or nft),

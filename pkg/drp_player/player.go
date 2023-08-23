@@ -367,14 +367,14 @@ func (s *DrpPlayer) initTC() error {
 		Markfree:     int(s.session.Markfree),
 		Markfull:     int(s.session.Markfull),
 		Qosmode:      s.session.Qosmode,
-		Uenum:        s.multisession.UenumTotal,
+		Uenum:        s.multisession.UenumTotal + 1,
 	}
 	DEBUG.Printf("Init Tc: %+v", settings)
 	err := s.tc.InitMultijens(settings,
 		trafficcontrol.NftStartParams{
 			L4sPremarking: s.session.L4sEnablePreMarking,
 			SignalStart:   s.session.SignalDrpStart,
-			Uenum:         s.multisession.UenumTotal,
+			Uenum:         s.multisession.UenumTotal + 1,
 			SingleQueue:   s.multisession.SingleQueue,
 		},
 		s.multisession.FixedNetflows,

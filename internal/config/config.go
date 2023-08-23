@@ -65,11 +65,15 @@ func (c *config) readFromFile() error {
 		DrpMode:                true,
 		ShareCapacityResources: viper.GetBool("drplay.sharecapacityresources"),
 	}
+	// strip unused netflow specs
+	numberOfNetflows := len(multisession.FixedNetflows)
+	if uint8(numberOfNetflows) > multisession.UenumTotal {
+		multisession.FixedNetflows = multisession.FixedNetflows[:numberOfNetflows-1]
+	}
 	// min number of UEs is 2
 	multisession.SingleQueue = false
-	if multisession.UenumTotal < 2 {
+	if multisession.UenumTotal == 1 {
 		multisession.SingleQueue = true
-		multisession.UenumTotal = 2
 	}
 	asd := datatypes.DB_session{
 		//TC
