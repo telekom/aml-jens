@@ -353,9 +353,11 @@ func (s *DrpPlayer) initTC() error {
 		initialDatarateKbits = float64(s.session.ChildDRP.Peek() * 1.33)
 	} else {
 		initialDatarateKbits = float64(s.multisession.Bandwidthkbits)
-		initNumberOfUes := len(s.multisession.FixedNetflows) + 1
-		if s.multisession.ShareCapacityResources && initNumberOfUes > 1 {
-			initialDatarateKbits /= float64(initNumberOfUes)
+		if !s.multisession.SingleQueue {
+			initNumberOfUes := len(s.multisession.FixedNetflows) + 1
+			if s.multisession.ShareCapacityResources && initNumberOfUes > 1 {
+				initialDatarateKbits /= float64(initNumberOfUes)
+			}
 		}
 	}
 	settings := trafficcontrol.TrafficControlStartParams{
