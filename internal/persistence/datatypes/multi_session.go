@@ -37,9 +37,11 @@ type DB_multi_session struct {
 func (s *DB_multi_session) Insert(stmt SQLStmt) error {
 	err := stmt.QueryRow(`INSERT INTO multisession (
     name,
+	bandwidthkbits,                       
     uenum_total
-	) VALUES ($1, $2) RETURNING multisession_id`,
+	) VALUES ($1, $2, $3) RETURNING multisession_id`,
 		s.Name,
+		s.Bandwidthkbits,
 		s.UenumTotal).Scan(&s.Multisession_id)
 	return err
 }
