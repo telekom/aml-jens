@@ -96,7 +96,6 @@ func ArgParse() (err error) {
 		"scale",
 		1,
 		"defines a scale factor which will be used to multiply the drp;  must be greater 0.1")
-	result.ChildDRP.Initial_scale = scale
 
 	postgresPtr := flag.Bool(
 		"psql",
@@ -110,6 +109,7 @@ func ArgParse() (err error) {
 		"only play drp, no queue measures are recorded")
 
 	flag.Parse()
+	result.ChildDRP.Initial_scale = scale
 	result.ChildDRP.Freq = frequency
 
 	var bandwidthkbits int = 0
