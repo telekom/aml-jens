@@ -38,7 +38,7 @@ import (
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 const MULTIJENS_CTRL_FILE = "/sys/kernel/debug/sch_multijens/0001:v1"
-const MAX_UENUM = 16
+const MAX_UENUM = 32
 
 type TrafficControlStartParams struct {
 	Datarate     uint32
