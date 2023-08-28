@@ -68,11 +68,6 @@ func (s *DB_data_rate_pattern) GetEstimatedPlaytime() int {
 }
 
 //go:inline
-func (s *DB_data_rate_pattern) GetSQLExistsStatement() string {
-	return `select exists (select distinct drp_id from data_rate_pattern where drp_id = $1);`
-}
-
-//go:inline
 func (s *DB_data_rate_pattern) GetSQLExistsArgs() []any {
 	return []any{s.Id}
 }
@@ -149,7 +144,42 @@ func (s *DB_data_rate_pattern) Insert(stmt SQLStmt) error {
 	return err
 }
 func (s *DB_data_rate_pattern) Sync(stmt SQLStmt) error {
-	WARN.Println("Syncing a DRP has no effect. INSERTING instead")
+	row := stmt.QueryRow(`select drp_id from data_rate_pattern WHERE 
+	drp_sha256 = $1 AND
+	"name"= $2 AND
+	description = $3 AND
+	loop = $4 AND
+	freq = $5 AND
+	scale = $6 AND
+	minrateKbits = $7 AND
+	th_mq_latency = $8 AND
+	th_p95_latency = $9 AND
+	th_p99_latency = $10 AND
+	th_p999_latency = $11 AND
+	th_link_usage = $12 LIMIT 1;`,
+		s.GetHash(),
+		s.GetName(),
+		s.GetDescription(),
+		s.dr_pattern.Iterator().IsLooping(),
+		s.Freq,
+		s.dr_pattern.GetScale(),
+		s.dr_pattern.GetMinRateKbits(),
+		s.GetTh_mq_latency(),
+		s.GetTh_p95_latency(),
+		s.GetTh_p99_latency(),
+		s.GetTh_p999_latency(),
+		s.GetTh_link_usage(),
+	)
+	if row == nil {
+		WARN.Println("Check for drp exist returned nill")
+	}
+	if row.Err() != nil {
+		return row.Err()
+	}
+	err := row.Scan(&s.Id)
+	if err != sql.ErrNoRows {
+		return err
+	}
 	return s.Insert(stmt)
 }
 
