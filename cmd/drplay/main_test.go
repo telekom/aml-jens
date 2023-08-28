@@ -22,9 +22,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,7 +57,7 @@ func TestBrokenArgParse(t *testing.T) {
 		{"-freq", "36"},
 		{"-dev", "eno1"},
 		{"-pattern", filepath.Join("../../test/testdata/drp", "drp_3valleys.csv")},
-		//{"-psql"},
+		{"-psql"},
 		{"-scale", "0.36"},
 		{"-tag", "aTestTag36"},
 	}
@@ -161,6 +163,88 @@ func validate(t *testing.T, set []int, sess *datatypes.DB_session, cleanup func(
 			t.Fatalf(caseB, 6, fmt.Sprintf("-tag='%s'", sess.Name))
 		}
 
+	}
+
+}
+
+type test_case struct {
+	Args        []string
+	description string
+	is_good     bool
+	Validations []func(m_ses datatypes.DB_multi_session) error
+}
+
+func (s *test_case) addValidation(f func(m_ses datatypes.DB_multi_session) error) *test_case {
+	s.Validations = append(s.Validations, f)
+	return s
+}
+func NewTestCase(args string, descritpion string, is_good bool) *test_case {
+	return &test_case{
+		Args:        strings.Split(args, " "),
+		description: descritpion,
+		is_good:     is_good,
+	}
+}
+
+func (s *test_case) Validate(t *testing.T, err error, m_ses *datatypes.DB_multi_session) {
+	var fails []string
+	if s.is_good && err != nil {
+		t.Logf("Test: %s: failed with %s, but should be ok", s.description, err.Error())
+		t.Fail()
+		return
+	}
+	if !s.is_good && err == nil {
+		t.Logf("Test: %s: ArgParse successful, but should fail", s.description)
+		t.Fail()
+		return
+	}
+	if !s.is_good && err != nil {
+		return
+	}
+	for _, v := range s.Validations {
+		if err := v(*m_ses); err != nil {
+			fails = append(fails, err.Error())
+		}
+	}
+	if len(fails) > 0 {
+		t.Logf("Test: %s: ", s.description)
+		for _, f := range fails {
+			t.Logf("\t %s", f)
+		}
+		t.Fail()
+	}
+}
+
+func TestBandidthParameterArgParse(t *testing.T) {
+	test_cases := []*test_case{
+		NewTestCase("-bandwidth 100", "only bandwidth NO unit parameter; no unit", false),
+		NewTestCase("-dev lo -bandwidth 100", "bandwidth NO unit & dev parameter", false),
+		NewTestCase("-dev lo -bandwidth 100m", "bandwidth & dev parameter", true).addValidation(func(m_ses datatypes.DB_multi_session) error {
+			if m_ses.Bandwidthkbits != 100000 {
+				return fmt.Errorf("Expected bandwidth to be 100m, got %d", m_ses.Bandwidthkbits)
+			}
+			if m_ses.DrpMode {
+				return fmt.Errorf("DrpMode should not be set, if BW is supplied")
+			}
+			return nil
+		}), NewTestCase("-dev lo -bandwidth 100k", "bandwidth & dev parameter", true).addValidation(func(m_ses datatypes.DB_multi_session) error {
+			if m_ses.Bandwidthkbits != 100 {
+				return fmt.Errorf("Expected bandwidth to be 100m, got %d", m_ses.Bandwidthkbits)
+			}
+			if m_ses.DrpMode {
+				return fmt.Errorf("DrpMode should not be set, if BW is supplied")
+			}
+			return nil
+		}),
+	}
+
+	for _, tcase := range test_cases {
+		t.Run(tcase.description, func(t *testing.T) {
+			flag.CommandLine = flag.NewFlagSet("", flag.ContinueOnError)
+			preTest(t, tcase.Args)
+			err := ArgParse()
+			tcase.Validate(t, err, config.PlayCfg().A_MultiSession)
+		})
 	}
 
 }
