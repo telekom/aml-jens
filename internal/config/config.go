@@ -156,6 +156,7 @@ func (c *config) setToDefaults() {
 		ParentBenchmark: &datatypes.DB_benchmark{
 			PrintToStdOut: true,
 		},
+		ParentMultisession: &datatypes.DB_multi_session{},
 	}
 	c.player = &DrPlayConfig{
 		A_Session: &asd,
@@ -166,7 +167,8 @@ func (c *config) setToDefaults() {
 			Port:     0,
 			User:     "default",
 		},
-		PrintToStdOut: true,
+		PrintToStdOut:  true,
+		A_MultiSession: asd.ParentMultisession,
 	}
 	var scaleMode ConfigFlowPlotScrollMode = Scrolling
 	scaleMode = Scaling
