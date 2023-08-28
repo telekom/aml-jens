@@ -32,3 +32,7 @@ go.work
 # Generated debian packages
 *.deb
 deployments/_build/*
+XX_*
+dump_*
+.aml-jens/**/*
+comparison_sessions/**/*
