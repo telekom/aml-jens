@@ -44,9 +44,15 @@ import (
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-func ArgParse() (err error) {
+func ArgParse() error {
 	result := config.PlayCfg().A_Session
+	var err error
 	var looping bool
+	var frequency int
+	var bandwidthInUnit string
+	var scale float64
+	var bandwidthkbits int = 0
+	var pattern_path string
 	// parse parameters
 	version := flag.Bool("v", false, "prints build version")
 	flag.StringVar(
@@ -54,48 +60,43 @@ func ArgParse() (err error) {
 		"dev",
 		"",
 		"nic to play data rate pattern on, default 'lo'")
-
-	pattern_path := flag.String(
-		"pattern",
-		"",
-		"csv file for data rate pattern (seperator enter, values in kbits), e.g. /etc/jens-cli/drp_3valleys.csv")
-
-	var frequency int
-	flag.IntVar(
-		&frequency,
-		"freq",
-		10,
-		"number of samples per second to play [1 ... 100], default 10")
 	flag.StringVar(
 		&result.Name,
 		"tag",
 		time.Now().Format("2006.01.02 15:04:05"),
 		"tag of this measure session")
-	config.PlayCfg().A_MultiSession.Name = result.Name
+	flag.StringVar(
+		&pattern_path,
+		"pattern",
+		"",
+		"csv file for data rate pattern (seperator enter, values in kbits), e.g. /etc/jens-cli/drp_3valleys.csv")
 
-	var bandwidthInUnit string
+	flag.IntVar(
+		&frequency,
+		"freq",
+		10,
+		"number of samples per second to play [1 ... 100], default 10")
+	flag.BoolVar(
+		&looping,
+		"loop",
+		false,
+		"defines if data rate pattern player should run in an endless loop")
+	flag.Float64Var(
+		&scale,
+		"scale",
+		1,
+		"defines a scale factor which will be used to multiply the drp;  must be greater 0.1")
+
 	flag.StringVar(&bandwidthInUnit,
 		"bandwidth",
 		"",
 		"total bandwidth in unit m(mbits) or k(kbits)")
 
 	flag.BoolVar(
-		&looping,
-		"loop",
-		false,
-		"defines if data rate pattern player should run in an endless loop")
-	flag.BoolVar(
 		&result.ParentBenchmark.CsvOuptut,
 		"csv",
 		false,
 		"output measure records to csv file")
-
-	var scale float64
-	flag.Float64Var(
-		&scale,
-		"scale",
-		1,
-		"defines a scale factor which will be used to multiply the drp;  must be greater 0.1")
 
 	postgresPtr := flag.Bool(
 		"psql",
@@ -109,10 +110,18 @@ func ArgParse() (err error) {
 		"only play drp, no queue measures are recorded")
 
 	flag.Parse()
+	cfg := config.PlayCfg()
+	if *version {
+		fmt.Printf("Version      : %s\n", assets.VERSION)
+		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
+		os.Exit(0)
+	}
+	if result.Dev == "" {
+		return fmt.Errorf("flag: 'dev' was not set")
+	}
 	result.ChildDRP.Initial_scale = scale
 	result.ChildDRP.Freq = frequency
-
-	var bandwidthkbits int = 0
+	cfg.A_MultiSession.Name = result.Name
 	if bandwidthInUnit != "" {
 		unit := strings.ToLower(bandwidthInUnit[len(bandwidthInUnit)-1:])
 		bandwidthkbits, err = strconv.Atoi(bandwidthInUnit[:len(bandwidthInUnit)-1])
@@ -122,34 +131,27 @@ func ArgParse() (err error) {
 		if unit == "m" {
 			bandwidthkbits *= 1000
 		} else if unit != "k" {
-			logging.FlagParseExit("specified bandwidth must be in unit m(mbits) or k(kbits), e.g. 20000k")
+			return fmt.Errorf("specified bandwidth must be in unit m(mbits) or k(kbits), e.g. 20000k")
 		}
-	}
-
-	drpExists := *pattern_path != "" || looping || scale != 1.0 || frequency != 10
-	if drpExists && bandwidthkbits != 0 {
-		logging.FlagParseExit("Either a data rate pattern (with -loop or -scale option) or a fixed bandwidth must be defined to limit capacity")
-	}
-	if *pattern_path == "" && bandwidthkbits == 0 {
-		*pattern_path = "/etc/jens-cli/drp_3valleys.csv"
-	}
-	if bandwidthkbits != 0 {
 		config.PlayCfg().A_MultiSession.Bandwidthkbits = bandwidthkbits
 		config.PlayCfg().A_MultiSession.DrpMode = false
+	} else {
+		//Pattern Mode
+		if pattern_path == "" {
+			pattern_path = "/etc/jens-cli/drp_3valleys.csv"
+		}
+		err := result.ChildDRP.ParseDRP(drp.NewDataRatePatternFileProvider(pattern_path))
+		if err != nil {
+			return fmt.Errorf("could not load pattern from path %s", pattern_path)
+		}
+		result.ChildDRP.SetLooping(looping)
 	}
 
-	if *version {
-		fmt.Printf("Version      : %s\n", assets.VERSION)
-		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)
-		os.Exit(0)
-	}
-	if result.Dev == "" {
-		logging.FlagParseExit("Flag: 'dev' was not set")
-	}
 	if *postgresPtr {
 		err := persistence.SetPersistenceTo(&psql.DataBase{}, &config.PlayCfg().Psql)
 		if err != nil {
-			return err
+			WARN.Println(err)
+			return fmt.Errorf("could not connect to the psql database")
 		}
 	} else {
 		err := persistence.SetPersistenceTo(&mock.Database{}, &datatypes.Login{})
@@ -157,11 +159,7 @@ func ArgParse() (err error) {
 			return err
 		}
 	}
-	if *pattern_path != "" {
-		err = result.ChildDRP.ParseDRP(drp.NewDataRatePatternFileProvider(*pattern_path))
-		result.ChildDRP.SetLooping(looping)
-	}
-	return err
+	return nil
 }
 
 func exithandler(player *drplay.DrpPlayer, exit chan uint8) {
@@ -197,9 +195,9 @@ func main() {
 	INFO.Printf("===>Starting DrPlay @%s <===\n\n", time.Now().String())
 	var player_has_ended = make(chan uint8)
 	if err := ArgParse(); err != nil {
-		FATAL.Println("Error during Argparse")
-		FATAL.Exit(err)
+		logging.FlagParseExit(err.Error())
 	}
+
 	db, err := persistence.GetPersistence()
 	if err != nil {
 		FATAL.Println(err)
