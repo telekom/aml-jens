@@ -117,12 +117,11 @@ func TestDrpHashWithChangesToScaleMinLoop(t *testing.T) {
 			Intial_minRateKbits: 120400,
 		},
 	}
-	for i, v := range db_drps {
+	for _, v := range db_drps {
 		err := v.ParseDRP(drp.NewDataRatePatternFileProvider(SAW_PATH))
 		if err != nil {
 			t.Fatalf("Loaded valid drp, got an error: %s", err)
 		}
-		t.Log(i)
 		t.Log(v.GetStats())
 		if v.GetHashStr() != "acd87822fa43d98efc9b854884336ff3" {
 			t.Fatalf("Hash is incorrect. Is: '%s', should be %s", v.GetHashStr(), "acd87822fa43d98efc9b854884336ff3")
