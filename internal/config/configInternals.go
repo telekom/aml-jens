@@ -44,7 +44,7 @@ func createNewConfig() (config, error) {
 	cfg := config{}
 	err := cfg.readFromFile()
 	if err != nil {
-		FATAL.Println("Config not found in default path.")
+		WARN.Println("Config not found in default path.")
 		cfg.setToDefaults()
 	}
 	cfg.setDefaults()
