@@ -56,7 +56,7 @@ type DB_session struct {
 
 // Executes a sqlstmt to Insert this session into DB
 func (s *DB_session) Insert(stmt SQLStmt) error {
-	err := s.ChildDRP.Insert(stmt)
+	err := s.ChildDRP.Sync(stmt)
 	if err != nil {
 		return err
 	}
