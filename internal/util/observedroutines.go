@@ -14,8 +14,8 @@ const (
 )
 
 type RoutineReport struct {
-	Wg               *sync.WaitGroup
-	On_extern_exit_c chan uint8
+	Wg              *sync.WaitGroup
+	Exit_now_signal chan uint8
 	//This channel should be used, in the event of a fatal-ish error
 	Send_error_c chan struct {
 		Err   error
