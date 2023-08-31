@@ -25,10 +25,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
@@ -162,34 +160,6 @@ func ArgParse() error {
 	return nil
 }
 
-func exithandler(player *drplay.DrpPlayer, exit chan uint8) {
-
-	exit_handler := make(chan os.Signal)
-	signal.Notify(exit_handler, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT)
-	go func() {
-		select {
-		case <-exit:
-			return
-		case sig := <-exit_handler:
-			INFO.Printf("Received Signal: %d", sig)
-			player.Exit()
-		}
-	}()
-}
-
-func exitHandler(player *drplay.DrpPlayer) {
-	exit_handler := make(chan os.Signal)
-	signal.Notify(exit_handler, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT)
-	go func() {
-		sig := <-exit_handler
-		// Run Cleanup
-		INFO.Printf("Received Signal: %d\n", sig)
-		player.Exit_clean()
-		INFO.Printf("Resources resetted\n")
-		os.Exit(1)
-	}()
-}
-
 func main() {
 	logging.InitLogger(assets.NAME_DRPLAY)
 	INFO.Printf("===>Starting DrPlay @%s <===\n\n", time.Now().String())
@@ -211,10 +181,10 @@ func main() {
 	logging.LinkExitFunction(func() uint8 {
 		FATAL.Println("Logger experienced a fatal error")
 		player.Exit()
-		panic("A")
-		//return 255
+		WARN.Println("Logger ended program")
+		return 255
 	}, 5000)
-	exitHandler(player)
+	//exitHandler(player, player_has_ended)
 
 	err = player.Start()
 	if err != nil {
