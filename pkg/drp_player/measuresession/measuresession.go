@@ -205,14 +205,15 @@ func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.Traffic
 }
 func (m MeasureSession) Start(r util.RoutineReport) {
 	// open memory file stream
-	INFO.Println("start measure Session")
+	INFO.Printf("start measure Session: %s\n", m.Session.Name)
 
 	// compute offset of monotonic and system clock
 
 	// start aggregate and persist threads with communication channels
 
 	go func() {
-		<-r.On_extern_exit_c
+		<-r.Exit_now_signal
+		INFO.Printf("set to quit ms: %s\n", m.Session.Name)
 		m.should_end = true
 		m.Persistor.Exit()
 	}()
@@ -227,7 +228,6 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 			Level: level,
 		}
 	}, func() {
-
 		DEBUG.Println("Closing Persistor")
 		m.Wg.Done()
 	})
@@ -238,7 +238,7 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 	go m.aggregateMeasures(r)
 
 	m.Wg.Wait()
-	DEBUG.Println("Closed measure_session")
+	DEBUG.Printf("Closed measure_session %s\n", m.Session.Name)
 	r.Wg.Done()
 }
 
@@ -327,7 +327,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 	defer func() {
 		DEBUG.Println("Closed AggregateMeasures")
 		close(m.chan_to_persistence)
-		//m.Wg.Done()
+		m.Wg.Done()
 	}()
 	doExit := false
 	p, err := persistence.GetPersistence()
