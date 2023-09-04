@@ -74,6 +74,7 @@ func (s *DataBase) Init(login *datatypes.Login) error {
 			if err != nil {
 				return err
 			}
+			db.SetMaxOpenConns(80)
 			s.Db = db
 			if err != nil {
 				return err
@@ -107,6 +108,7 @@ func (s *DataBase) initTransactions() error {
 }
 
 func (s *DataBase) prep_bulk_stmts() (err error) {
+	INFO.Printf("%+v\n", s.Db.Stats())
 	s.txMQ, err = s.Db.Begin()
 	if err != nil {
 		return err
