@@ -27,7 +27,11 @@ const MONITOR_NETFLOW_DURATION_S = 3
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-var sessions []*measuresession.MeasureSession
+type MultiSession_Session struct {
+	ms           measuresession.MeasureSession
+	time_created time.Time
+	is_permament bool
+}
 
 type DrpPlayer struct {
 	multisession        *datatypes.DB_multi_session
@@ -36,6 +40,7 @@ type DrpPlayer struct {
 	r                   util.RoutineReport
 	is_shutting_down    bool
 	close_channel_mutex *sync.Mutex
+	ue_s                []MultiSession_Session
 }
 
 func NewDrpPlayer(config *config.DrPlayConfig) *DrpPlayer {
@@ -45,6 +50,7 @@ func NewDrpPlayer(config *config.DrPlayConfig) *DrpPlayer {
 		is_shutting_down: false,
 		multisession:     config.A_MultiSession,
 		session:          config.A_Session,
+		ue_s:             make([]MultiSession_Session, 0, 16),
 		r: util.RoutineReport{
 			Wg:              &wg,
 			Exit_now_signal: make(chan uint8),
@@ -76,7 +82,7 @@ func (s *DrpPlayer) launchMultiChangeLoop(waitTime time.Duration, drp *datatypes
 			return
 		case <-ticker.C:
 			value, err := drp.Next()
-			numberOfActiveUes := len(sessions)
+			numberOfActiveUes := len(s.ue_s)
 			if numberOfActiveUes > 1 && shareCapacityResources {
 				value /= float64(numberOfActiveUes)
 			}
@@ -228,14 +234,17 @@ func (s *DrpPlayer) launchMeasureSession(i int, db *persistence.Persistence, net
 		FATAL.Println(err)
 		os.Exit(1)
 	}
+	multisession_session := MultiSession_Session{
+		time_created: time.Now(),
+		is_permament: fixedNetflow,
+	}
 	// filename to read queue measures
 	suffix := fmt.Sprintf("0%d:0", i)
 	thisMeasureFilename := MEASURE_FILE_MULTIJENS_PRAEFIX + suffix
-	ms := measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename, fixedNetflow)
+	multisession_session.ms = measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename, fixedNetflow)
 	s.r.Wg.Add(1)
-	go ms.Start(s.r)
-
-	sessions = append(sessions, &ms)
+	go multisession_session.ms.Start(s.r)
+	s.ue_s = append(s.ue_s, multisession_session)
 }
 
 func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.RoutineReport, shareCapacityResources bool) {
@@ -248,90 +257,100 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 		case <-monitoringTicker.C:
 			// remove non relevant UEs
 			uesChanged := false
-			for i := 1; i < len(sessions); i++ {
-				ueSession := sessions[i]
-				if ueSession.FixedNetflow {
-					continue
-				}
-
-				var sumLoadBytes uint64 = 0
-				for _, aggregated_measure := range ueSession.AggregateMeasurePerNetflow {
-					sumLoadBytes += aggregated_measure.SumloadTotalBytes
-					aggregated_measure.SumloadTotalBytes = 0
-				}
-				ueLoadKbits := sumLoadBytes / (125 * uint64(sampleDuration.Seconds()))
-				INFO.Printf("ue%v netflow %v %v loadKbits", ueSession.Session.Uenum, ueSession.Session.NetflowFilter, ueLoadKbits)
-				if ueLoadKbits < uint64(s.multisession.UeMinloadkbits) {
-					ueSession.Wg.Done()
-					sessions = append(sessions[:i], sessions[i+1:]...)
-					uesChanged = true
-					INFO.Printf("ue %v removed", ueSession.Session.Uenum)
-				}
-			}
-
-			// if traffic in ue0 relevant, launch neu UE
+			// Check catchall UE
+			// if traffic in ue0 relevant, launch new UE
 			// get max load in netflow for ue 0
-			if uint8(len(sessions)) < s.multisession.UenumTotal {
-				ue0Session := sessions[0]
+			if uint8(len(s.ue_s)) < s.multisession.UenumTotal {
+				ue0 := s.ue_s[0]
 				var maxUe0LoadByte uint64 = 0
-				var newNetflow string
+				var flow_to_split_name string
+				var flow_to_split_rule string
 				INFO.Printf("check default queue ue0 for new UEs ...")
-				for _, aggregated_measure := range ue0Session.AggregateMeasurePerNetflow {
-					INFO.Printf("netflow %v %v byte", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
+				for key, aggregated_measure := range ue0.ms.AggregateMeasurePerNetflow {
+					INFO.Printf("Checking: %v", aggregated_measure.Net_flow.MeasureIdStr())
 					if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
 						maxUe0LoadByte = aggregated_measure.SumloadTotalBytes
-						protocolType := aggregated_measure.Net_flow.TransportProtocoll
-						newNetflow = fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
-							aggregated_measure.Net_flow.Source_ip,
-							protocolType,
-							aggregated_measure.Net_flow.Source_port,
-							aggregated_measure.Net_flow.Destination_ip,
-							protocolType,
-							aggregated_measure.Net_flow.Destination_port)
+						flow_to_split_name = key
+						flow_to_split_rule = aggregated_measure.AsRule()
 					}
 					aggregated_measure.SumloadTotalBytes = 0
 				}
 				// add netflow as ue, if relevant
 				avgLoadKbits := maxUe0LoadByte / (125 * uint64(sampleDuration.Seconds()))
 				if avgLoadKbits > uint64(s.multisession.UeMinloadkbits) {
-					lastSessionIndex := len(sessions)
-					s.launchMeasureSession(lastSessionIndex, db, newNetflow, false)
+					/**
+					  * delete(ue0.ms.AggregateMeasurePerNetflow, flow_to_split_name)
+					  * It would be good to delete unnecessary Flows.
+					  * BUT: This breaks a lot of things.
+					  * TODO: Research why
+					  *
+					**/
+					lastSessionIndex := len(s.ue_s)
+					INFO.Printf("ADDING ue%v netflow %v %v kbits added", lastSessionIndex, flow_to_split_name, avgLoadKbits)
+					s.launchMeasureSession(lastSessionIndex, db, flow_to_split_rule, false)
 					uesChanged = true
-					INFO.Printf("ue%v netflow %v %v kbits added", lastSessionIndex, newNetflow, avgLoadKbits)
 				}
 			}
+			ue_copy := make([]MultiSession_Session, 0, 16)
+			for _, ue := range s.ue_s {
+				if ue.is_permament || time.Since(ue.time_created) < time.Second*5 {
+					ue_copy = append(ue_copy, ue)
+					continue
+				}
 
-			// reinstanciate marking rules
+				var sumLoadBytes uint64 = 0
+				// A non automatic UE _can_ have more than 1 Aggregate Measure
+				for _, aggregated_measure := range ue.ms.AggregateMeasurePerNetflow {
+					sumLoadBytes += aggregated_measure.SumloadTotalBytes
+					aggregated_measure.SumloadTotalBytes = 0
+				}
+				//What is this calculation ?
+				ueLoadKbits := sumLoadBytes / (125 * uint64(sampleDuration.Seconds()))
+				if ueLoadKbits < uint64(s.multisession.UeMinloadkbits/3) {
+					INFO.Printf("REMOVING: ue%v netflow %v %v loadKbits", ue.ms.Session.Uenum, ue.ms.Session.NetflowFilter, ueLoadKbits)
+					ue.ms.Stop()
+					uesChanged = true
+					INFO.Printf("ue %v removed", ue.ms.Session.Uenum)
+				} else {
+					ue_copy = append(ue_copy, ue)
+				}
+			}
 			if uesChanged {
-				INFO.Printf("rebuild nft marking rules")
-				trafficcontrol.ResetNFT(assets.NFT_TABLE_UEMARK)
-				var netfilter []string
-				for _, session := range sessions {
-					if session.Session.NetflowFilter != "" {
-						netfilter = append(netfilter, session.Session.NetflowFilter)
-					}
-				}
-				err := trafficcontrol.CreateRulesMarkUe(netfilter)
-				if err != nil {
-					FATAL.Println(err)
-				}
-				if !s.multisession.DrpMode {
-					// adjust bandwidth per UE
-					bandwidthPerUE := float64(s.multisession.Bandwidthkbits)
-					if len(sessions) > 1 && shareCapacityResources {
-						bandwidthPerUE /= float64(len(sessions))
-					}
-					//change data rate in control file
-					if err := s.tc.ChangeMultiTo(bandwidthPerUE); err != nil {
-						r.ReportFatal(fmt.Errorf("monitorTrafficPerUe could not change value: %w", err))
-						r.Wg.Done()
-						return
-					}
-				}
+				s.ue_s = ue_copy
+				// reinstanciate marking rules
+				s.rebuild_marking_rules(shareCapacityResources, r)
 			}
 		case <-r.Exit_now_signal:
 			s.r.Wg.Done()
 			INFO.Println("Finishing ip monitorTrafficPerUE")
+			return
+		}
+	}
+}
+
+func (s *DrpPlayer) rebuild_marking_rules(shareCapacityResources bool, r util.RoutineReport) {
+	INFO.Printf("rebuild nft marking rules")
+	var netfilter []string
+	for _, session := range s.ue_s {
+		if session.ms.Session.NetflowFilter != "" {
+			netfilter = append(netfilter, session.ms.Session.NetflowFilter)
+		}
+	}
+	trafficcontrol.ResetNFT(assets.NFT_TABLE_UEMARK)
+	err := trafficcontrol.CreateRulesMarkUe(netfilter)
+	if err != nil {
+		FATAL.Println(err)
+	}
+	if !s.multisession.DrpMode {
+		// adjust bandwidth per UE
+		bandwidthPerUE := float64(s.multisession.Bandwidthkbits)
+		if len(s.ue_s) > 1 && shareCapacityResources {
+			bandwidthPerUE /= float64(len(s.ue_s))
+		}
+		//change data rate in control file
+		if err := s.tc.ChangeMultiTo(bandwidthPerUE); err != nil {
+			r.ReportFatal(fmt.Errorf("monitorTrafficPerUe could not change value: %w", err))
+			s.r.Wg.Done()
 			return
 		}
 	}
@@ -363,6 +382,10 @@ func (s *DrpPlayer) close_channel() {
 func (s *DrpPlayer) ExitNoWait() {
 	DEBUG.Println("DrpPlayer was asked to Exit()")
 	s.close_channel()
+	for _, session := range s.ue_s {
+		session.ms.Stop()
+
+	}
 }
 
 func (s *DrpPlayer) Exit() {
@@ -392,6 +415,7 @@ func (s *DrpPlayer) initTC() error {
 		Qosmode:      s.session.Qosmode,
 		Uenum:        s.multisession.UenumTotal + 1,
 	}
+	s.tc.Reset()
 	DEBUG.Printf("Init Tc: %+v", settings)
 	err := s.tc.InitMultijens(settings,
 		trafficcontrol.NftStartParams{

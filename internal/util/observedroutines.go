@@ -23,10 +23,11 @@ type RoutineReport struct {
 	}
 	//This channel should be used, if and only if some goroutine markes the application as finished
 	Application_has_finished chan string
-	exits                    []chan interface{}
 }
 
 func (r RoutineReport) Report(err error, level ErrorLevel) {
+	WARN.Printf("[%d]%+v\n", level, err)
+
 	select {
 	case r.Send_error_c <- struct {
 		Err   error

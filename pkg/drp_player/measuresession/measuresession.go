@@ -70,6 +70,15 @@ type AggregateMeasure struct {
 
 var currentCapacityKbits uint64
 
+func (s *AggregateMeasure) AsRule() string {
+	return fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
+		s.Net_flow.Source_ip,
+		s.Net_flow.TransportProtocoll,
+		s.Net_flow.Source_port,
+		s.Net_flow.Destination_ip,
+		s.Net_flow.TransportProtocoll,
+		s.Net_flow.Destination_port)
+}
 func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 	var sampleCapacityKbits uint64
 	sample_duration := util.MaxInt(SAMPLE_DURATION_MS, int(s.t_end-s.t_start))
@@ -129,7 +138,6 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	// aggregate sample values
 	s.sumSojournTimeMs += pm.sojournTimeMs
 	s.sumloadBytes += uint64(pm.packetSizeByte)
-	// for statistics
 	s.SumloadTotalBytes += uint64(pm.packetSizeByte)
 	//Fix for setting capacity to maximum
 	if capacity == 4294967295 {
@@ -203,6 +211,11 @@ func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.Traffic
 	}
 
 }
+func (m *MeasureSession) Stop() {
+	INFO.Printf("Stopping MeasureSession %v", m.should_end)
+	m.should_end = true
+	m.Persistor.Stop()
+}
 func (m MeasureSession) Start(r util.RoutineReport) {
 	// open memory file stream
 	INFO.Printf("start measure Session: %s\n", m.Session.Name)
@@ -210,14 +223,6 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 	// compute offset of monotonic and system clock
 
 	// start aggregate and persist threads with communication channels
-
-	go func() {
-		<-r.Exit_now_signal
-		INFO.Printf("set to quit ms: %s\n", m.Session.Name)
-		m.should_end = true
-		m.Persistor.Exit()
-	}()
-
 	m.Wg.Add(1)
 	go m.Persistor.Run(m.chan_to_persistence, func(err error, level util.ErrorLevel) {
 		r.Send_error_c <- struct {
@@ -259,7 +264,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 		dummy = nil
 	}
 	defer func() {
-		DEBUG.Println("Closed: Poll")
+		INFO.Println("Closed: Poll")
 		if file != nil {
 			file.Close()
 		}
@@ -273,7 +278,6 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 		// poll fd
 		rc := C.poll(&pfd, 1, 1000)
 		if rc <= 0 {
-			//INFO.Println("rc <= 0")
 			continue
 		}
 		// read one record of either packet or queue type
@@ -283,7 +287,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 		}
 
 		if bytesRead != 64 {
-			r.ReportInfo(fmt.Errorf("bytesRead != 64 while reading recordArray"))
+			r.ReportInfo(fmt.Errorf("bytesRead != 64 while reading recordArray %+v", m.should_end))
 			continue
 		}
 		timestampMs := uint64(binary.LittleEndian.Uint64(recordArray[0:8])) / 1e6
@@ -311,11 +315,11 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 				CapacityKbits:     currentCapacityKbits,
 				Fk_session_tag_id: m.Session.Session_id,
 			}
-			if !m.should_end {
-				m.chan_to_persistence <- queueMeasure
-			} else {
+			if m.should_end {
 				return
+
 			}
+			m.chan_to_persistence <- queueMeasure
 		default: //Error
 			r.ReportWarn(fmt.Errorf("could not parse record_array (type): %+v", recordArray))
 		}
