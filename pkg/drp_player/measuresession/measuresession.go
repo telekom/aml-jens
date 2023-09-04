@@ -187,7 +187,7 @@ type MeasureSession struct {
 	FixedNetflow               bool
 }
 
-func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, queueFilename string, fixedNetflow bool) MeasureSession {
+func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.TrafficControl, queueFilename string, fixedNetflow bool) *MeasureSession {
 	monotonicMs := uint64(C.get_nsecs()) / 1e6
 	systemMs := uint64(time.Now().UnixMilli())
 	var wg sync.WaitGroup
@@ -196,7 +196,7 @@ func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.Traffic
 		WARN.Printf("Could not create persisitor: %v", err)
 	}
 
-	return MeasureSession{
+	return &MeasureSession{
 		Session:                    session,
 		tc:                         tc,
 		chan_to_aggregation:        make(chan PacketMeasure, 10000),
@@ -212,18 +212,27 @@ func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.Traffic
 
 }
 func (m *MeasureSession) Stop() {
-	INFO.Printf("Stopping MeasureSession %v", m.should_end)
 	m.should_end = true
+	DEBUG.Printf("should_end=true (%p)\n", m)
 	m.Persistor.Stop()
 }
-func (m MeasureSession) Start(r util.RoutineReport) {
+func (m *MeasureSession) Start(r util.RoutineReport) {
+
+	DEBUG.Printf("[rWG+]MeasureSession.Start (%p)\n", &m)
+	r.Wg.Add(1)
+
 	// open memory file stream
 	INFO.Printf("start measure Session: %s\n", m.Session.Name)
 
 	// compute offset of monotonic and system clock
 
 	// start aggregate and persist threads with communication channels
+	DEBUG.Printf("[mWG+] Persistor (%p)\n", &m)
 	m.Wg.Add(1)
+	defer func() {
+		r.Wg.Done()
+		DEBUG.Printf("[rWG-]MeasureSession.Start (%p)\n", &m)
+	}()
 	go m.Persistor.Run(m.chan_to_persistence, func(err error, level util.ErrorLevel) {
 		r.Send_error_c <- struct {
 			Err   error
@@ -233,24 +242,24 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 			Level: level,
 		}
 	}, func() {
-		DEBUG.Println("Closing Persistor")
+		DEBUG.Printf("[mWG-] Closing Persistor (%p).(%p)\n", &m, &m.Persistor)
 		m.Wg.Done()
 	})
-	m.Wg.Add(1)
+
 	go m.poll(r, m.queueFilename)
 
-	m.Wg.Add(1)
 	go m.aggregateMeasures(r)
-
+	DEBUG.Printf("[mWG?] Waiting (%p)\n", &m)
 	m.Wg.Wait()
-	DEBUG.Printf("Closed measure_session %s\n", m.Session.Name)
-	r.Wg.Done()
+	DEBUG.Printf("[mWG0] Closed measure_session %s (%v)\n", m.Session.Name, &m)
 }
 
 // Represents the polling loop.
 // Will close if membervariable m.shouldEnd becomes true
 // Will foreward this signal by closing chan_to_aggregation
 func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
+	DEBUG.Println("[mWG+]poll")
+	m.Wg.Add(1)
 	//Buffer in which the contets of MM_FILE will be written
 	recordArray := make(RecordArray, RECORD_SIZE)
 	var file, err = os.Open(measureFileName)
@@ -269,6 +278,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 			file.Close()
 		}
 		m.Wg.Done()
+		DEBUG.Println("[mWG-]poll")
 		//Forward closing to aggregation
 		close(m.chan_to_aggregation)
 	}()
@@ -326,10 +336,12 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 	}
 }
 func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
+	DEBUG.Printf("[mWG+]aggregateMeasures (%p)\n", &m)
+	m.Wg.Add(1)
 	sampleDuration := SAMPLE_DURATION_MS * time.Millisecond
 	ticker := time.NewTicker(sampleDuration)
 	defer func() {
-		DEBUG.Println("Closed AggregateMeasures")
+		DEBUG.Printf("[mWG-]aggregateMeasures (%p)\n", &m)
 		close(m.chan_to_persistence)
 		m.Wg.Done()
 	}()
