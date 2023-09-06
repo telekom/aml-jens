@@ -191,6 +191,8 @@ func main() {
 		FATAL.Println(err)
 		os.Exit(-1)
 	}
+	// wait till all threads are launched and stopped finally
+	time.Sleep(1 * time.Second)
 	player.Wait()
 	close(player_has_ended)
 	if err := (*db).Close(); err != nil {
