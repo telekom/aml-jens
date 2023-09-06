@@ -108,7 +108,6 @@ func (s *AggregateMeasure) reset() {
 	s.sumSojournTimeMs = 0
 	s.sampleCount = 0
 	s.t_start = 0
-	s.t_end = 0
 }
 
 func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
@@ -127,7 +126,11 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 
 func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	if s.t_start == 0 {
-		s.t_start = pm.timestampMs
+		// start of the sample intervall is end of the previous one
+		s.t_start = s.t_end
+		if s.t_end == 0 {
+			s.t_start = pm.timestampMs
+		}
 	}
 	s.t_end = pm.timestampMs
 	if pm.drop {
