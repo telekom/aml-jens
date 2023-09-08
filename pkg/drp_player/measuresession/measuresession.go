@@ -124,7 +124,7 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 	}
 }
 
-func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
+func (s *AggregateMeasure) add(pm *PacketMeasure) {
 	if s.t_start == 0 {
 		// start of the sample intervall is end of the previous one
 		s.t_start = s.t_end
@@ -143,14 +143,7 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	s.sumloadBytes += uint64(pm.packetSizeByte)
 	s.SumloadTotalBytes += uint64(pm.packetSizeByte)
 	//Fix for setting capacity to maximum
-	if capacity == 4294967295 {
-		//if dummy capacity.
-		s.sumCapacityKbits = -1
-		//s.sumCapacityKbits += float64(pm.packetSizeByte)
-
-	} else {
-		s.sumCapacityKbits += int64(capacity)
-	}
+	s.sumCapacityKbits += int64(pm.currentCapacityKbits)
 
 	if pm.ecnOut == 3 {
 		s.sumEcnNCE++
@@ -311,6 +304,7 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 				r.ReportWarn(fmt.Errorf("could not parse packetMeasure: %w", err))
 			}
 			if packetMeasure != nil {
+				packetMeasure.currentCapacityKbits = currentCapacityKbits
 				m.chan_to_aggregation <- *packetMeasure
 
 			} else {
@@ -388,7 +382,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 					}
 				}
 
-				measure.add(&message, currentCapacityKbits)
+				measure.add(&message)
 			default:
 				readMessages = false
 			}
