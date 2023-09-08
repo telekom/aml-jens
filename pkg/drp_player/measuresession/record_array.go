@@ -55,17 +55,18 @@ func (record RecordArray) AsDB_measure_queue(session_id int) (*DB_measure_queue,
 }
 
 type PacketMeasure struct {
-	timestampMs    uint64
-	sojournTimeMs  uint32
-	ecnIn          uint8
-	ecnOut         uint8
-	ecnValid       bool
-	slow           bool
-	mark           bool
-	drop           bool
-	ipVersion      uint8
-	packetSizeByte uint32
-	net_flow       *datatypes.DB_network_flow
+	timestampMs          uint64
+	sojournTimeMs        uint32
+	ecnIn                uint8
+	ecnOut               uint8
+	ecnValid             bool
+	slow                 bool
+	mark                 bool
+	drop                 bool
+	ipVersion            uint8
+	packetSizeByte       uint32
+	currentCapacityKbits uint64
+	net_flow             *datatypes.DB_network_flow
 }
 
 // Creates a new PacketMeasure from the supplied Record.
