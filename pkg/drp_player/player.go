@@ -28,7 +28,7 @@ const MONITOR_NETFLOW_DURATION_S = 3
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type MultiSession_Session struct {
-	ms           measuresession.MeasureSession
+	ms           *measuresession.MeasureSession
 	time_created time.Time
 	is_permament bool
 }
@@ -40,7 +40,7 @@ type DrpPlayer struct {
 	r                   util.RoutineReport
 	is_shutting_down    bool
 	close_channel_mutex *sync.Mutex
-	ue_s                []MultiSession_Session
+	ue_s                []*MultiSession_Session
 }
 
 func NewDrpPlayer(config *config.DrPlayConfig) *DrpPlayer {
@@ -50,7 +50,7 @@ func NewDrpPlayer(config *config.DrPlayConfig) *DrpPlayer {
 		is_shutting_down: false,
 		multisession:     config.A_MultiSession,
 		session:          config.A_Session,
-		ue_s:             make([]MultiSession_Session, 0, 16),
+		ue_s:             make([]*MultiSession_Session, 0, 16),
 		r: util.RoutineReport{
 			Wg:              &wg,
 			Exit_now_signal: make(chan uint8),
@@ -73,12 +73,17 @@ func NewDrpPlayer(config *config.DrPlayConfig) *DrpPlayer {
 // Blockig - also spawns 1 short lived routine
 func (s *DrpPlayer) launchMultiChangeLoop(waitTime time.Duration, drp *datatypes.DB_data_rate_pattern, r util.RoutineReport, shareCapacityResources bool) {
 	ticker := time.NewTicker(waitTime)
+	DEBUG.Println("[rWG+]launchMultiChangeLoopDone")
+	s.r.Wg.Add(1)
+	defer func() {
+		DEBUG.Println("[rWG-]launchMultiChangeLoopDone")
+		r.Wg.Done()
+	}()
 	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
 	for {
 		select {
 		case <-r.Exit_now_signal:
 			DEBUG.Println("Closing TC-loop")
-			r.Wg.Done()
 			return
 		case <-ticker.C:
 			value, err := drp.Next()
@@ -89,18 +94,15 @@ func (s *DrpPlayer) launchMultiChangeLoop(waitTime time.Duration, drp *datatypes
 			if err != nil {
 				if _, ok := err.(*errortypes.IterableStopError); ok {
 					r.Application_has_finished <- "DataRatePattern has finished"
-					r.Wg.Done()
 					return
 				} else {
 					r.ReportWarn(fmt.Errorf("LaunchChangeLoop could retrieve next Value: %w", err))
-					r.Wg.Done()
 					return
 				}
 			}
 			//change data rate in control file
 			if err := s.tc.ChangeMultiTo(value); err != nil {
 				r.ReportFatal(fmt.Errorf("LaunchChangeLoop could not change value: %w", err))
-				r.Wg.Done()
 				return
 			}
 		}
@@ -137,9 +139,8 @@ func (s *DrpPlayer) Start() error {
 
 		select {
 		case sig := <-exit_handler:
-			INFO.Printf("Received Signal: %d", sig)
+			DEBUG.Printf("Received Signal: %d", sig)
 			s.ExitNoWait()
-			INFO.Printf("Resources resetted\n")
 		case msg := <-s.r.Application_has_finished:
 			INFO.Println(msg)
 			DEBUG.Println("Exiting: Application_has_finished")
@@ -203,8 +204,6 @@ func (s *DrpPlayer) Start() error {
 	}
 
 	if s.multisession.DrpMode {
-		// play drp
-		s.r.Wg.Add(1)
 		go s.launchMultiChangeLoop(
 			time.Duration(1000/s.session.ChildDRP.Freq)*time.Millisecond,
 			s.session.ChildDRP,
@@ -215,7 +214,7 @@ func (s *DrpPlayer) Start() error {
 
 	//monitor ue load, synchronize queues
 	if !s.multisession.SingleQueue && !s.session.Nomeasure {
-		s.r.Wg.Add(1)
+
 		go s.monitorTrafficPerUe(db, s.r, s.multisession.ShareCapacityResources)
 	}
 
@@ -234,23 +233,26 @@ func (s *DrpPlayer) launchMeasureSession(i int, db *persistence.Persistence, net
 		FATAL.Println(err)
 		os.Exit(1)
 	}
-	multisession_session := MultiSession_Session{
+	new_multi_session := &MultiSession_Session{
 		time_created: time.Now(),
 		is_permament: fixedNetflow,
 	}
 	// filename to read queue measures
-	suffix := fmt.Sprintf("0%d:0", i)
-	thisMeasureFilename := MEASURE_FILE_MULTIJENS_PRAEFIX + suffix
-	multisession_session.ms = measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename, fixedNetflow)
-	s.r.Wg.Add(1)
-	go multisession_session.ms.Start(s.r)
-	s.ue_s = append(s.ue_s, multisession_session)
+	thisMeasureFilename := fmt.Sprintf(MEASURE_FILE_MULTIJENS_PRAEFIX+"0%d:0", i)
+	new_multi_session.ms = measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename, fixedNetflow)
+	go new_multi_session.ms.Start(s.r)
+	s.ue_s = append(s.ue_s, new_multi_session)
 }
 
 func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.RoutineReport, shareCapacityResources bool) {
 	sampleDuration := MONITOR_NETFLOW_DURATION_S * time.Second
 	monitoringTicker := time.NewTicker(sampleDuration)
-
+	DEBUG.Println("[rWG+]monitorTrafficPerUe")
+	s.r.Wg.Add(1)
+	defer func() {
+		DEBUG.Println("[rWG-]monitorTrafficPerUe")
+		s.r.Wg.Done()
+	}()
 	// timer to monitor traffic per UE
 	for {
 		select {
@@ -291,7 +293,7 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 					uesChanged = true
 				}
 			}
-			ue_copy := make([]MultiSession_Session, 0, 16)
+			ue_copy := make([]*MultiSession_Session, 0, 16)
 			for _, ue := range s.ue_s {
 				if ue.is_permament || time.Since(ue.time_created) < time.Second*5 {
 					ue_copy = append(ue_copy, ue)
@@ -321,8 +323,6 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 				s.rebuild_marking_rules(shareCapacityResources, r)
 			}
 		case <-r.Exit_now_signal:
-			s.r.Wg.Done()
-			INFO.Println("Finishing ip monitorTrafficPerUE")
 			return
 		}
 	}
@@ -362,6 +362,7 @@ func (s *DrpPlayer) Exit_clean() {
 	}
 }
 func (s *DrpPlayer) Wait() {
+	DEBUG.Println("[rWG?] waiting")
 	s.r.Wg.Wait()
 	s.Exit_clean()
 	DEBUG.Println("Player has exited")
@@ -381,11 +382,10 @@ func (s *DrpPlayer) close_channel() {
 }
 func (s *DrpPlayer) ExitNoWait() {
 	DEBUG.Println("DrpPlayer was asked to Exit()")
-	s.close_channel()
 	for _, session := range s.ue_s {
 		session.ms.Stop()
-
 	}
+	s.close_channel()
 }
 
 func (s *DrpPlayer) Exit() {

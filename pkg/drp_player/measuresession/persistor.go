@@ -102,7 +102,6 @@ func (s *MeasureSessionPersistor) init_csv() error {
 // Only has an effect if csv writing is active
 // Flushes all Wirters and Closes all opened files.
 func (s *MeasureSessionPersistor) Stop() {
-	DEBUG.Println("Closing MeasureSessionPersistor")
 	close(s.exit_persistor)
 	if s.csv != nil {
 		s.csv.QueueWriter.Flush()
@@ -153,9 +152,13 @@ func (s *MeasureSessionPersistor) persist(sample interface{}) error {
 //
 // Blocking, releases Wg
 func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error func(err error, lvl util.ErrorLevel), done func()) {
-	// todo refactor persistence
+	defer done()
+
 	var err error
 	persistenceInstance, err := persistence.GetPersistence()
+	if err != nil {
+		report_error(err, util.ErrFatal)
+	}
 	newPersistenceInstance, err := (*persistenceInstance).GetNewInstance()
 	if err != nil {
 		report_error(fmt.Errorf("persistMeasures: %w", err), util.ErrWarn)
@@ -167,7 +170,6 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 	for {
 		select {
 		case <-s.exit_persistor:
-			//Stop() was called
 			return
 		case <-tickerPersist.C:
 			readSamples := true
@@ -177,7 +179,6 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 					if !ok {
 						DEBUG.Println("Closing persistor due to closed channel")
 						s.Stop()
-						done()
 						return
 					}
 					switch sample := sampleInterface.(type) {
