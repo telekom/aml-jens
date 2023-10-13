@@ -70,10 +70,11 @@ type FlowT struct {
 	Dst    NetEndPoint
 	FlowId int32 //Relic of the past. used for id-ing. set by manager!
 	Prio   int
+	Uenum  int
 }
 
 func (s *FlowT) Color() uint8 {
-	color := uint8(s.FlowId)
+	color := uint8(s.Uenum + 1)
 	if color > 14 {
 		color += 1
 	}
@@ -137,17 +138,18 @@ func (self *FlowT) FmtString() string {
 	)
 }
 
-func NewFlow(src string, dst string, prio string) *FlowT {
+func NewFlow(src string, dst string, prio string, uenum int) *FlowT {
 	p, err := strconv.Atoi(prio)
 	if err != nil {
 		p = 9
 	}
 
 	return &FlowT{
-		Src:  *NewNetEndPointFromString(src),
-		Dst:  *NewNetEndPointFromString(dst),
-		D:    *NewFlowDataPoints(),
-		Prio: p}
+		Src:   *NewNetEndPointFromString(src),
+		Dst:   *NewNetEndPointFromString(dst),
+		D:     *NewFlowDataPoints(),
+		Prio:  p,
+		Uenum: uenum}
 }
 
 func (self *FlowT) Equals(other *FlowT) bool {
