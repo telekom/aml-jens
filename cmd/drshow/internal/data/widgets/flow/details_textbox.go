@@ -56,10 +56,11 @@ func NewFlowDetailsTextBox(ctx context.Context, t terminalapi.Terminal, chans *c
 
 			timePassed = time.Since(time.UnixMilli(int64((*flow.D.TimeStamp)[len(*flow.D.TimeStamp)-1]))).Round(time.Second).String()
 		}
-		txt := fmt.Sprintf("ID:   %04d\nSrc:%s\nDst:%s\nCount:%s\nPrio:%d\nLastSample:%s ago",
+		txt := fmt.Sprintf("ID:   %04d\nSrc:%s\nDst:%s\nUEnum:%d\nCount:%s\nPrio:%d\nLastSample:%s ago",
 			flow.FlowId,
 			flow.Src.Str(),
 			flow.Dst.Str(),
+			flow.Uenum,
 			util.FormatLabelISO(float64(flow.D.Length())),
 			flow.Prio,
 			timePassed,
