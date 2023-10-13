@@ -47,6 +47,7 @@ const (
 	i_drop
 	i_prio
 	i_netw
+	i_uenum
 )
 const (
 	in_src = iota
@@ -161,10 +162,10 @@ func (man *FlowManager) get(f *FlowT) *FlowT {
 	}
 	return nil
 }
-func (man *FlowManager) GetAndAppendTo(f *FlowT, ts float64, sj float64, ld float64, ec float64, dr float64, cap float64) {
+func (man *FlowManager) GetAndAppendTo(f *FlowT, ts float64, sj float64, ld float64, ec float64, dr float64, cap float64, ue_num int) {
 	v := man.get(f)
 	v.D.Append(ts, sj, ld, ec, dr, cap)
-
+	v.Uenum = ue_num
 	if err := man.Handler.NewDataInFlow(v); err != nil {
 		man.ExitApplicationErr(err.Error())
 	}
@@ -309,10 +310,15 @@ func (manager *FlowManager) ReadFromLine(line string) bool {
 		WARN.Printf("Did not find correct flow format: %s", splitData[i_netw])
 		return false
 	}
+	uenum, err := strconv.ParseInt(splitData[i_uenum], 10, 8)
+	if err != nil {
+		return false
+	}
 	f := NewFlow(
 		net_data[in_src],
 		net_data[in_dst],
 		splitData[i_prio],
+		int(uenum),
 	)
 	//manager.Mutex.Lock()
 	if !manager.Contains(f) {
@@ -326,6 +332,7 @@ func (manager *FlowManager) ReadFromLine(line string) bool {
 		parseFloat(splitData[i_ecn]),
 		parseFloat(splitData[i_drop]),
 		parseFloat(splitData[i_capacity]),
+		f.Uenum,
 	)
 	//manager.Mutex.Unlock()
 	return true
