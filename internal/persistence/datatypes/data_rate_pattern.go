@@ -171,7 +171,7 @@ func (s *DB_data_rate_pattern) Sync(stmt SQLStmt) error {
 		s.GetTh_link_usage(),
 	)
 	if row == nil {
-		WARN.Println("Check for drp exist returned nill")
+		return errors.New("check for drp exist returned nill")
 	}
 	if row.Err() != nil {
 		return row.Err()
