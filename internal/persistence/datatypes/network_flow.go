@@ -97,7 +97,7 @@ func (s *DB_network_flow) MeasureIdStr() string {
 	if s.measure_id_str == "" {
 		var builder strings.Builder
 		builder.Grow(40)
-		fmt.Fprintf(&builder, "%s %s:%d-%s:%d", s.TransportProtocoll, s.Source_ip, s.Source_port, s.Destination_ip, s.Destination_port)
+		fmt.Fprintf(&builder, "%s:%d-%s:%d", s.Source_ip, s.Source_port, s.Destination_ip, s.Destination_port)
 		s.measure_id_str = builder.String()
 	}
 	return s.measure_id_str
