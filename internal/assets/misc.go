@@ -42,7 +42,7 @@ const (
 // Heading for stdout of drplay --> stdin for drshow.pipe
 //
 // [timestamp, soj, load, ...]
-var CONST_HEADING = []string{"timestampMs", "sojournTimeMs", "loadKbits", "capacityKbits", "ecnCePercent", "dropped", "prio", "netflow"}
+var CONST_HEADING = []string{"timestampMs", "sojournTimeMs", "loadKbits", "capacityKbits", "ecnCePercent", "dropped", "prio", "netflow", "uenum"}
 
 var END_OF_DRPLAY = [...]string{"data", "rate", "player", "ended"}
 
