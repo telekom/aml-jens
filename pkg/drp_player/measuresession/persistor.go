@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/telekom/aml-jens/internal/assets"
@@ -19,6 +20,7 @@ type MeasureSessionPersistor struct {
 	persist_frequency time.Duration
 	db                *persistence.Persistence
 	exit_persistor    chan uint8
+	should_exit       bool
 	// internal, anonymous, representation of needed io objects
 	csv *struct {
 		PacketFile   *os.File
@@ -37,11 +39,12 @@ func NewMeasureSessionPersistor(session *datatypes.DB_session) (*MeasureSessionP
 		session:           session,
 		persist_frequency: 1 * time.Second,
 		exit_persistor:    make(chan uint8),
+		should_exit:       false,
 	}
 	if session.ParentBenchmark.PrintToStdOut {
 		if session.ParentMultisession != nil {
 			if session.Uenum == 0 {
-				fmt.Println(strings.Join(append(assets.CONST_HEADING, "uenum"), " "))
+				fmt.Println(strings.Join(assets.CONST_HEADING, " "))
 			}
 		} else {
 			fmt.Println(strings.Join(assets.CONST_HEADING, " "))
@@ -100,8 +103,12 @@ func (s *MeasureSessionPersistor) init_csv() error {
 }
 
 // Only has an effect if csv writing is active
-// Flushes all Wirters and Closes all opened files.
+// Flushes all Writers and Closes all opened files.
 func (s *MeasureSessionPersistor) Stop() {
+	if s.should_exit {
+		return
+	}
+	s.should_exit = true
 	close(s.exit_persistor)
 	if s.csv != nil {
 		s.csv.QueueWriter.Flush()
@@ -109,7 +116,6 @@ func (s *MeasureSessionPersistor) Stop() {
 		s.csv.QueueFile.Close()
 		s.csv.PacketFile.Close()
 	}
-	(*s.db).Commit()
 }
 
 func (s *MeasureSessionPersistor) persist(sample interface{}) error {
@@ -119,12 +125,13 @@ func (s *MeasureSessionPersistor) persist(sample interface{}) error {
 	}
 	if measure_packet, ok := sample.(DB_measure_packet); ok && s.session.ParentBenchmark.PrintToStdOut {
 		if err := measure_packet.PrintLine(); err != nil {
-			if strings.HasSuffix(err.Error(), "broken pipe") {
-				WARN.Printf("could not write Measurement: %s", err)
-				WARN.Printf("Setting printToStdOut to false")
-				s.session.ParentBenchmark.PrintToStdOut = false
+			if !strings.HasSuffix(err.Error(), "broken pipe") {
+				return fmt.Errorf("while writing to stdout: %w", err)
 			}
-			return nil
+			WARN.Printf("could not write Measurement: %s", err)
+			DEBUG.Printf("Setting printToStdOut to false")
+			s.session.ParentBenchmark.PrintToStdOut = false
+			syscall.Kill(syscall.Getpid(), syscall.SIGPIPE)
 		}
 	}
 	if s.csv == nil {
@@ -170,9 +177,13 @@ func (s *MeasureSessionPersistor) Run(samples chan interface{}, report_error fun
 	for {
 		select {
 		case <-s.exit_persistor:
+			if s.db != nil {
+				(*s.db).Commit()
+				(*s.db).Close()
+			}
 			return
 		case <-tickerPersist.C:
-			readSamples := true
+			readSamples := !s.should_exit
 			for readSamples {
 				select {
 				case sampleInterface, ok := <-samples:
