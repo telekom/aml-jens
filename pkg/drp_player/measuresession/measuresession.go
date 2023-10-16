@@ -209,7 +209,6 @@ func NewMeasureSession(session *datatypes.DB_session, tc *trafficcontrol.Traffic
 }
 func (m *MeasureSession) Stop() {
 	m.should_end = true
-	DEBUG.Printf("should_end=true (%p)\n", m)
 	m.Persistor.Stop()
 }
 func (m *MeasureSession) Start(r util.RoutineReport) {
@@ -227,6 +226,7 @@ func (m *MeasureSession) Start(r util.RoutineReport) {
 	m.Wg.Add(1)
 	defer func() {
 		r.Wg.Done()
+		INFO.Printf("end measure Session: %s\n", m.Session.Name)
 		DEBUG.Printf("[rWG-]MeasureSession.Start (%p)\n", &m)
 	}()
 	go m.Persistor.Run(m.chan_to_persistence, func(err error, level util.ErrorLevel) {
@@ -269,7 +269,6 @@ func (m *MeasureSession) poll(r util.RoutineReport, measureFileName string) {
 		dummy = nil
 	}
 	defer func() {
-		INFO.Println("Closed: Poll")
 		if file != nil {
 			file.Close()
 		}

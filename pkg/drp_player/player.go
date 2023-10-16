@@ -77,7 +77,7 @@ func (s *DrpPlayer) launchMultiChangeLoop(waitTime time.Duration, drp *datatypes
 	s.r.Wg.Add(1)
 	defer func() {
 		DEBUG.Println("[rWG-]launchMultiChangeLoopDone")
-		r.Wg.Done()
+		s.r.Wg.Done()
 	}()
 	INFO.Printf("start playing DataRatePattern @%s", waitTime.String())
 	for {
@@ -381,7 +381,7 @@ func (s *DrpPlayer) close_channel() {
 
 }
 func (s *DrpPlayer) ExitNoWait() {
-	DEBUG.Println("DrpPlayer was asked to Exit()")
+	DEBUG.Println("DrpPlayer was asked to Exit")
 	for _, session := range s.ue_s {
 		session.ms.Stop()
 	}
