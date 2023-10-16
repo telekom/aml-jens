@@ -160,8 +160,10 @@ func (s *DataBase) Persist(obj interface{}) error {
 			return fmt.Errorf("Persist(datatypes.DB_network_flow)%v", err)
 		}
 		return nil
+	case *datatypes.DB_data_rate_pattern:
+		return v.Sync(s.Db)
 	case persistence.DumbPersistable:
-		//Catch for benchmark, data_rate_pattern
+		//Catch for benchmark
 		DEBUG.Printf("{interface {persistence.DumbPersistable}} --> %v", reflect.TypeOf(v))
 		return v.Insert(s.Db)
 	default:
@@ -176,7 +178,7 @@ func (s *DataBase) Persist(obj interface{}) error {
 func (s *DataBase) persist_measure_packet(data datatypes.DB_measure_packet) error {
 
 	if data.Fk_flow_id == -1 {
-		return errors.New("trying to persist a meausre_packet without its Fk_flow_id set.")
+		return errors.New("trying to persist a meausre_packet without its Fk_flow_id set")
 	}
 	if data.Capacitykbits == 0 {
 		//Do not persist samples where capacity is 0
