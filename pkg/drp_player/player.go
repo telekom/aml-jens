@@ -23,7 +23,7 @@ import (
 )
 
 const MEASURE_FILE_MULTIJENS_PRAEFIX = "/sys/kernel/debug/sch_multijens/0001-"
-const MONITOR_NETFLOW_DURATION_S = 3
+const MONITOR_NETFLOW_DURATION_S = 10
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
@@ -164,9 +164,9 @@ func (s *DrpPlayer) Start() error {
 
 		}
 
-		INFO.Println("Waiting for palyer")
+		INFO.Println("Waiting for player")
 		s.Wait()
-		INFO.Println("Finished Waiting for palyer")
+		INFO.Println("Finished Waiting for player")
 
 	}()
 	if s.multisession.DrpMode {
@@ -214,14 +214,13 @@ func (s *DrpPlayer) Start() error {
 
 	//monitor ue load, synchronize queues
 	if !s.multisession.SingleQueue && !s.session.Nomeasure {
-
 		go s.monitorTrafficPerUe(db, s.r, s.multisession.ShareCapacityResources)
 	}
 
 	return nil
 }
 
-func (s *DrpPlayer) launchMeasureSession(i int, db *persistence.Persistence, netflowFilter string, fixedNetflow bool) {
+func (s *DrpPlayer) launchMeasureSession(i int, db *persistence.Persistence, netflowFilter string, fixedNetflow bool) *MultiSession_Session {
 	ueSession := *s.session
 	ueSession.Time = uint64(time.Now().UnixMilli())
 	ueSession.Uenum = uint8(i)
@@ -242,6 +241,8 @@ func (s *DrpPlayer) launchMeasureSession(i int, db *persistence.Persistence, net
 	new_multi_session.ms = measuresession.NewMeasureSession(&ueSession, s.tc, thisMeasureFilename, fixedNetflow)
 	go new_multi_session.ms.Start(s.r)
 	s.ue_s = append(s.ue_s, new_multi_session)
+
+	return new_multi_session
 }
 
 func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.RoutineReport, shareCapacityResources bool) {
@@ -257,25 +258,45 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 	for {
 		select {
 		case <-monitoringTicker.C:
-			// remove non relevant UEs
 			uesChanged := false
-			// Check catchall UE
+			ue_copy := make([]*MultiSession_Session, 0, s.multisession.UenumTotal)
+
+			// remove non relevant UEs
+			INFO.Printf("check for inactive UEs ...")
+			for _, ue := range s.ue_s {
+				if !ue.is_permament {
+					var sumLoadBytes uint64 = 0
+					// A non automatic UE can have more than one Aggregate Measure
+					for _, aggregated_measure := range ue.ms.AggregateMeasurePerNetflow {
+						sumLoadBytes += aggregated_measure.SumloadTotalBytes
+					}
+					ueLoadKbits := sumLoadBytes / (125 * uint64(sampleDuration.Seconds()))
+					if ueLoadKbits < uint64(s.multisession.UeMinloadkbits/3) {
+						INFO.Printf("REMOVING: UE%v netflow %v %v sumLoadBytes %v loadKbits", ue.ms.Session.Uenum, ue.ms.Session.NetflowFilter, sumLoadBytes, ueLoadKbits)
+						ue.ms.Stop()
+						uesChanged = true
+						INFO.Printf("UE %v removed", ue.ms.Session.Uenum)
+						continue
+					}
+				}
+				ue_copy = append(ue_copy, ue)
+			}
+
 			// if traffic in ue0 relevant, launch new UE
 			// get max load in netflow for ue 0
-			if uint8(len(s.ue_s)) < s.multisession.UenumTotal {
+			if uint8(len(ue_copy)) < s.multisession.UenumTotal {
 				ue0 := s.ue_s[0]
 				var maxUe0LoadByte uint64 = 0
 				var flow_to_split_name string
 				var flow_to_split_rule string
-				INFO.Printf("check default queue ue0 for new UEs ...")
+				INFO.Printf("check default queue UE0 for new UEs ...")
 				for key, aggregated_measure := range ue0.ms.AggregateMeasurePerNetflow {
-					INFO.Printf("Checking: %v", aggregated_measure.Net_flow.MeasureIdStr())
+					INFO.Printf("%v load bytes %v", aggregated_measure.Net_flow.MeasureIdStr(), aggregated_measure.SumloadTotalBytes)
 					if aggregated_measure.SumloadTotalBytes > maxUe0LoadByte {
 						maxUe0LoadByte = aggregated_measure.SumloadTotalBytes
 						flow_to_split_name = key
 						flow_to_split_rule = aggregated_measure.AsRule()
 					}
-					aggregated_measure.SumloadTotalBytes = 0
 				}
 				// add netflow as ue, if relevant
 				avgLoadKbits := maxUe0LoadByte / (125 * uint64(sampleDuration.Seconds()))
@@ -288,39 +309,23 @@ func (s *DrpPlayer) monitorTrafficPerUe(db *persistence.Persistence, r util.Rout
 					  *
 					**/
 					lastSessionIndex := len(s.ue_s)
-					INFO.Printf("ADDING ue%v netflow %v %v kbits added", lastSessionIndex, flow_to_split_name, avgLoadKbits)
-					s.launchMeasureSession(lastSessionIndex, db, flow_to_split_rule, false)
+					INFO.Printf("ADDING ue%v netflow %v %v kbits", lastSessionIndex, flow_to_split_name, avgLoadKbits)
+					new_multi_session := s.launchMeasureSession(lastSessionIndex, db, flow_to_split_rule, false)
+					ue_copy = append(ue_copy, new_multi_session)
 					uesChanged = true
 				}
 			}
-			ue_copy := make([]*MultiSession_Session, 0, 16)
-			for _, ue := range s.ue_s {
-				if ue.is_permament || time.Since(ue.time_created) < time.Second*5 {
-					ue_copy = append(ue_copy, ue)
-					continue
-				}
 
-				var sumLoadBytes uint64 = 0
-				// A non automatic UE _can_ have more than 1 Aggregate Measure
-				for _, aggregated_measure := range ue.ms.AggregateMeasurePerNetflow {
-					sumLoadBytes += aggregated_measure.SumloadTotalBytes
-					aggregated_measure.SumloadTotalBytes = 0
-				}
-				//What is this calculation ?
-				ueLoadKbits := sumLoadBytes / (125 * uint64(sampleDuration.Seconds()))
-				if ueLoadKbits < uint64(s.multisession.UeMinloadkbits/3) {
-					INFO.Printf("REMOVING: ue%v netflow %v %v loadKbits", ue.ms.Session.Uenum, ue.ms.Session.NetflowFilter, ueLoadKbits)
-					ue.ms.Stop()
-					uesChanged = true
-					INFO.Printf("ue %v removed", ue.ms.Session.Uenum)
-				} else {
-					ue_copy = append(ue_copy, ue)
-				}
-			}
 			if uesChanged {
 				s.ue_s = ue_copy
 				// reinstanciate marking rules
 				s.rebuild_marking_rules(shareCapacityResources, r)
+			}
+			// reset aggregated monitoring load
+			for _, ue := range s.ue_s {
+				for _, aggregated_measure := range ue.ms.AggregateMeasurePerNetflow {
+					aggregated_measure.SumloadTotalBytes = 0
+				}
 			}
 		case <-r.Exit_now_signal:
 			return
