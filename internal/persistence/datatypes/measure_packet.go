@@ -28,27 +28,29 @@ import (
 // Implements MassPersistable interface
 type DB_measure_packet struct {
 	//Only for inprogram use! (=netFlowID)
-	Time                uint64
-	PacketSojournTimeMs uint32
-	LoadKbits           uint32
-	Ecn                 uint32
-	Dropped             uint32
-	Fk_flow_id          int
-	Capacitykbits       uint32
-	Net_flow_string     string
-	Net_flow_prio       uint8
+	Time                       uint64
+	PacketSojournTimeRealMs    uint32
+	PacketSojournTimeVirtuelMs uint32
+	LoadKbits                  uint32
+	Ecn                        uint32
+	Dropped                    uint32
+	Fk_flow_id                 int
+	Capacitykbits              uint32
+	Net_flow_string            string
+	Net_flow_prio              uint8
 }
 
 //go:inline
 func (DB_measure_packet) GetSQLStatement() string {
-	return "INSERT INTO measure_packet (time, packetsojourntimems, loadkbits, capacitykbits, ecn, dropped, fk_flow_id) VALUES ($1, $2, $3, $4, $5, $6, $7);"
+	return "INSERT INTO measure_packet (time, packetsojourntimems, packetsojourntimevirtuelms, loadkbits, capacitykbits, ecn, dropped, fk_flow_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);"
 }
 
 //go:inline
 func (s *DB_measure_packet) GetSQLArgs() []any {
 	return []any{
 		s.Time,
-		s.PacketSojournTimeMs,
+		s.PacketSojournTimeRealMs,
+		s.PacketSojournTimeVirtuelMs,
 		s.LoadKbits,
 		s.Capacitykbits,
 		s.Ecn,
@@ -59,11 +61,11 @@ func (s *DB_measure_packet) GetSQLArgs() []any {
 
 //go:inline
 func (s *DB_measure_packet) CsvRecord() []string {
-	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped), fmt.Sprint(s.Net_flow_prio), s.Net_flow_string}
+	return []string{fmt.Sprint(s.Time), fmt.Sprint(s.PacketSojournTimeRealMs), fmt.Sprint(s.LoadKbits), fmt.Sprint(s.Capacitykbits), fmt.Sprint(s.Ecn), fmt.Sprint(s.Dropped), fmt.Sprint(s.Net_flow_prio), s.Net_flow_string}
 }
 
 //go:inline
 func (s *DB_measure_packet) PrintLine() error {
-	_, err := fmt.Println(s.Time, s.PacketSojournTimeMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, s.Net_flow_prio, s.Net_flow_string)
+	_, err := fmt.Println(s.Time, s.PacketSojournTimeRealMs, s.LoadKbits, s.Capacitykbits, s.Ecn, s.Dropped, s.Net_flow_prio, s.Net_flow_string)
 	return err
 }
