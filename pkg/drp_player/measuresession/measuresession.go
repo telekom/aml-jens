@@ -56,15 +56,16 @@ type DB_network_flow = datatypes.DB_network_flow
 type DB_measure_queue = datatypes.DB_measure_queue
 
 type AggregateMeasure struct {
-	sampleCount      uint32
-	sumSojournTimeMs uint32
-	sumloadBytes     uint32
-	sumCapacityKbits int64
-	sumEcnNCE        uint32
-	sumDropped       uint32
-	net_flow         *datatypes.DB_network_flow
-	t_start          uint64
-	t_end            uint64
+	sampleCount             uint32
+	sumSojournTimeRealMs    uint32
+	sumSojournTimeVirtuelMs uint32
+	sumloadBytes            uint32
+	sumCapacityKbits        int64
+	sumEcnNCE               uint32
+	sumDropped              uint32
+	net_flow                *datatypes.DB_network_flow
+	t_start                 uint64
+	t_end                   uint64
 }
 
 var currentCapacityKbits uint64
@@ -79,28 +80,30 @@ func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 		sampleCapacityKbits = uint32(s.sumCapacityKbits) / s.sampleCount
 	}
 	return DB_measure_packet{
-		Time:                time,
-		PacketSojournTimeMs: s.sumSojournTimeMs / s.sampleCount,
-		LoadKbits:           loadKbits,
-		Ecn:                 uint32((float32(s.sumEcnNCE) / float32(s.sampleCount)) * 100),
-		Dropped:             s.sumDropped,
-		Fk_flow_id:          s.net_flow.Flow_id,
-		Capacitykbits:       sampleCapacityKbits,
-		Net_flow_string:     s.net_flow.MeasureIdStr(),
-		Net_flow_prio:       s.net_flow.Prio,
+		Time:                       time,
+		PacketSojournTimeRealMs:    s.sumSojournTimeRealMs / s.sampleCount,
+		PacketSojournTimeVirtuelMs: s.sumSojournTimeVirtuelMs / s.sampleCount,
+		LoadKbits:                  loadKbits,
+		Ecn:                        uint32((float32(s.sumEcnNCE) / float32(s.sampleCount)) * 100),
+		Dropped:                    s.sumDropped,
+		Fk_flow_id:                 s.net_flow.Flow_id,
+		Capacitykbits:              sampleCapacityKbits,
+		Net_flow_string:            s.net_flow.MeasureIdStr(),
+		Net_flow_prio:              s.net_flow.Prio,
 	}
 }
 
 func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 	return &AggregateMeasure{
-		sumloadBytes:     0,
-		sumDropped:       0,
-		sumEcnNCE:        0,
-		sumSojournTimeMs: 0,
-		sampleCount:      0,
-		net_flow:         flow,
-		t_start:          0,
-		t_end:            0,
+		sumloadBytes:            0,
+		sumDropped:              0,
+		sumEcnNCE:               0,
+		sumSojournTimeRealMs:    0,
+		sumSojournTimeVirtuelMs: 0,
+		sampleCount:             0,
+		net_flow:                flow,
+		t_start:                 0,
+		t_end:                   0,
 	}
 }
 
@@ -115,7 +118,8 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 		return
 	}
 	// aggregate sample values
-	s.sumSojournTimeMs += pm.sojournTimeMs
+	s.sumSojournTimeRealMs += pm.sojournTimeRealMs
+	s.sumSojournTimeVirtuelMs += pm.sojournTimeVirtuellMs
 	s.sumloadBytes += pm.packetSizeByte
 	//Fix for setting capacity to maximum
 	if capacity == 4294967295 {
@@ -133,23 +137,13 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	s.sampleCount++
 }
 
-type DbPacketMeasure struct {
-	timestampMs   uint64
-	sojournTimeMs uint32
-	loadKbits     uint32
-	capacityKbits uint32
-	ecnCePercent  uint32
-	dropped       uint32
-	netFlow       string
-}
-
 type DbQueueMeasure struct {
 	timestampMs            uint64
 	numberOfPacketsInQueue uint16
 	memUsageBytes          uint32
 }
 
-const MM_FILE = "/sys/kernel/debug/sch_janz/0001:0"
+const MM_FILE = "/sys/kernel/debug/sch_jensvq2proto/0001:0"
 
 const SAMPLE_DURATION_MS = 10
 
