@@ -71,10 +71,7 @@ type AggregateMeasure struct {
 var currentCapacityKbits uint64
 
 func (s *AggregateMeasure) AsRule() string {
-	return fmt.Sprintf("ip saddr %s %s sport %d ip daddr %s %s dport %d",
-		s.Net_flow.Source_ip,
-		s.Net_flow.TransportProtocoll,
-		s.Net_flow.Source_port,
+	return fmt.Sprintf("ip daddr %s %s dport %d",
 		s.Net_flow.Destination_ip,
 		s.Net_flow.TransportProtocoll,
 		s.Net_flow.Destination_port)
