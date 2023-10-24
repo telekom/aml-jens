@@ -58,7 +58,7 @@ type DB_measure_queue = datatypes.DB_measure_queue
 type AggregateMeasure struct {
 	sampleCount             uint32
 	sumSojournTimeRealMs    uint32
-	sumSojournTimeVirtuelMs uint32
+	sumSojournTimeVirtualMs uint32
 	sumloadBytes            uint32
 	sumCapacityKbits        int64
 	sumEcnNCE               uint32
@@ -82,7 +82,7 @@ func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 	return DB_measure_packet{
 		Time:                       time,
 		PacketSojournTimeRealMs:    s.sumSojournTimeRealMs / s.sampleCount,
-		PacketSojournTimeVirtuelMs: s.sumSojournTimeVirtuelMs / s.sampleCount,
+		PacketSojournTimeVirtualMs: s.sumSojournTimeVirtualMs / s.sampleCount,
 		LoadKbits:                  loadKbits,
 		Ecn:                        uint32((float32(s.sumEcnNCE) / float32(s.sampleCount)) * 100),
 		Dropped:                    s.sumDropped,
@@ -99,7 +99,7 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 		sumDropped:              0,
 		sumEcnNCE:               0,
 		sumSojournTimeRealMs:    0,
-		sumSojournTimeVirtuelMs: 0,
+		sumSojournTimeVirtualMs: 0,
 		sampleCount:             0,
 		net_flow:                flow,
 		t_start:                 0,
@@ -119,7 +119,7 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	}
 	// aggregate sample values
 	s.sumSojournTimeRealMs += pm.sojournTimeRealMs
-	s.sumSojournTimeVirtuelMs += pm.sojournTimeVirtuellMs
+	s.sumSojournTimeVirtualMs += pm.sojournTimeVirtualMs
 	s.sumloadBytes += pm.packetSizeByte
 	//Fix for setting capacity to maximum
 	if capacity == 4294967295 {

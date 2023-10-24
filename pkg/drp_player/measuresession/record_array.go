@@ -55,18 +55,18 @@ func (record RecordArray) AsDB_measure_queue(session_id int) (*DB_measure_queue,
 }
 
 type PacketMeasure struct {
-	timestampMs           uint64
-	sojournTimeRealMs     uint32
-	sojournTimeVirtuellMs uint32
-	ecnIn                 uint8
-	ecnOut                uint8
-	ecnValid              bool
-	slow                  bool
-	mark                  bool
-	drop                  bool
-	ipVersion             uint8
-	packetSizeByte        uint32
-	net_flow              *datatypes.DB_network_flow
+	timestampMs          uint64
+	sojournTimeRealMs    uint32
+	sojournTimeVirtualMs uint32
+	ecnIn                uint8
+	ecnOut               uint8
+	ecnValid             bool
+	slow                 bool
+	mark                 bool
+	drop                 bool
+	ipVersion            uint8
+	packetSizeByte       uint32
+	net_flow             *datatypes.DB_network_flow
 }
 
 // Creates a new PacketMeasure from the supplied Record.
@@ -104,24 +104,24 @@ func (record RecordArray) AsPacketMeasure(session_id int) (*PacketMeasure, error
 		Prio:             prio,
 	}
 
-	var sojournTimeDeltaVirtuelUs = uint32(binary.LittleEndian.Uint16(record[58:60])) << 8
-	sojournTimeDeltaVirtuelUs |= uint32(binary.LittleEndian.Uint16(record[10:12])) >> 8
-	var sojournTimeVirtuelUs = binary.LittleEndian.Uint32(record[12:16])
-	var sojournTimeRealUs = sojournTimeVirtuelUs - sojournTimeDeltaVirtuelUs
-	//INFO.Printf("sojournTimeVirtuelUs %v sojournTimeDeltaVirtuelUs %v sojournTimeRealUs %v", sojournTimeVirtuelUs, sojournTimeDeltaVirtuelUs, sojournTimeRealUs)
+	var sojournTimeDeltaVirtualUs = uint32(binary.LittleEndian.Uint16(record[58:60])) << 8
+	sojournTimeDeltaVirtualUs |= uint32(binary.LittleEndian.Uint16(record[10:12])) >> 8
+	var sojournTimeVirtualUs = binary.LittleEndian.Uint32(record[12:16])
+	var sojournTimeRealUs = sojournTimeVirtualUs - sojournTimeDeltaVirtualUs
+	//INFO.Printf("sojournTimeVirtualUs %v sojournTimeDeltaVirtualUs %v sojournTimeRealUs %v", sojournTimeVirtualUs, sojournTimeDeltaVirtualUs, sojournTimeRealUs)
 	packetMeasure := PacketMeasure{
-		timestampMs:           record.timestamp(),
-		sojournTimeRealMs:     sojournTimeRealUs / 1e3,
-		sojournTimeVirtuellMs: sojournTimeVirtuelUs / 1e3,
-		ecnIn:                 record[9] & 3,
-		ecnOut:                (record[9] & 24) >> 3,
-		ecnValid:              (record[9] & TC_JENS_RELAY_ECN_VALID) != 0,
-		slow:                  (record[9] & TC_JENS_RELAY_SOJOURN_SLOW) != 0,
-		mark:                  (record[9] & TC_JENS_RELAY_SOJOURN_MARK) != 0,
-		drop:                  (record[9] & TC_JENS_RELAY_SOJOURN_DROP) != 0,
-		ipVersion:             record[52],
-		packetSizeByte:        uint32(binary.LittleEndian.Uint32(record[48:52])),
-		net_flow:              &flow,
+		timestampMs:          record.timestamp(),
+		sojournTimeRealMs:    sojournTimeRealUs / 1e3,
+		sojournTimeVirtualMs: sojournTimeVirtualUs / 1e3,
+		ecnIn:                record[9] & 3,
+		ecnOut:               (record[9] & 24) >> 3,
+		ecnValid:             (record[9] & TC_JENS_RELAY_ECN_VALID) != 0,
+		slow:                 (record[9] & TC_JENS_RELAY_SOJOURN_SLOW) != 0,
+		mark:                 (record[9] & TC_JENS_RELAY_SOJOURN_MARK) != 0,
+		drop:                 (record[9] & TC_JENS_RELAY_SOJOURN_DROP) != 0,
+		ipVersion:            record[52],
+		packetSizeByte:       uint32(binary.LittleEndian.Uint32(record[48:52])),
+		net_flow:             &flow,
 	}
 	return &packetMeasure, nil
 }
