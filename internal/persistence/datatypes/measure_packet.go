@@ -30,7 +30,7 @@ type DB_measure_packet struct {
 	//Only for inprogram use! (=netFlowID)
 	Time                       uint64
 	PacketSojournTimeRealMs    uint32
-	PacketSojournTimeVirtuelMs uint32
+	PacketSojournTimeVirtualMs uint32
 	LoadKbits                  uint32
 	Ecn                        uint32
 	Dropped                    uint32
@@ -42,7 +42,7 @@ type DB_measure_packet struct {
 
 //go:inline
 func (DB_measure_packet) GetSQLStatement() string {
-	return "INSERT INTO measure_packet (time, packetsojourntimems, packetsojourntimevirtuelms, loadkbits, capacitykbits, ecn, dropped, fk_flow_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);"
+	return "INSERT INTO measure_packet (time, packetsojourntimems, packetsojourntimevirtualms, loadkbits, capacitykbits, ecn, dropped, fk_flow_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);"
 }
 
 //go:inline
@@ -50,7 +50,7 @@ func (s *DB_measure_packet) GetSQLArgs() []any {
 	return []any{
 		s.Time,
 		s.PacketSojournTimeRealMs,
-		s.PacketSojournTimeVirtuelMs,
+		s.PacketSojournTimeVirtualMs,
 		s.LoadKbits,
 		s.Capacitykbits,
 		s.Ecn,
