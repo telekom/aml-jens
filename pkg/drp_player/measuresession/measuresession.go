@@ -107,7 +107,7 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 	}
 }
 
-func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
+func (s *AggregateMeasure) add(pm *PacketMeasure) {
 	if s.t_start == 0 {
 		s.t_start = pm.timestampMs
 	}
@@ -121,15 +121,7 @@ func (s *AggregateMeasure) add(pm *PacketMeasure, capacity uint64) {
 	s.sumSojournTimeRealMs += pm.sojournTimeRealMs
 	s.sumSojournTimeVirtualMs += pm.sojournTimeVirtualMs
 	s.sumloadBytes += pm.packetSizeByte
-	//Fix for setting capacity to maximum
-	if capacity == 4294967295 {
-		//if dummy capacity.
-		s.sumCapacityKbits = -1
-		//s.sumCapacityKbits += float64(pm.packetSizeByte)
-
-	} else {
-		s.sumCapacityKbits += int64(capacity)
-	}
+	s.sumCapacityKbits += int64(pm.currentCapacityKbits)
 
 	if pm.ecnOut == 3 {
 		s.sumEcnNCE++
@@ -268,8 +260,8 @@ func (m *MeasureSession) poll(r util.RoutineReport) {
 				r.ReportWarn(fmt.Errorf("could not parse packetMeasure: %w", err))
 			}
 			if packetMeasure != nil {
+				packetMeasure.currentCapacityKbits = currentCapacityKbits
 				m.chan_to_aggregation <- *packetMeasure
-
 			} else {
 				//DEBUG.Printf("non ip packet ignored\n")
 			}
@@ -346,7 +338,7 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 					mapMeasures[message.net_flow.MeasureIdStr()] = measure
 				}
 
-				measure.add(&message, currentCapacityKbits)
+				measure.add(&message)
 
 			default:
 				readMessages = false
