@@ -66,6 +66,7 @@ type PacketMeasure struct {
 	drop                 bool
 	ipVersion            uint8
 	packetSizeByte       uint32
+	currentCapacityKbits uint64
 	net_flow             *datatypes.DB_network_flow
 }
 
