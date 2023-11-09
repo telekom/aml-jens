@@ -88,7 +88,7 @@ func convertDRPdata(strdata *[][]string, p struct {
 			return drp,
 				errortypes.NewUserInputError("Row %d: '%s' in drp is not a valid float64", i, str[0])
 		}
-		ret[i] = math.Max(float*p.Scale, p.MinRateKbits)
+		ret[i] = float * p.Scale
 		err = binary.Write(&hash_buf, binary.LittleEndian, float)
 		if err != nil {
 			return drp, err

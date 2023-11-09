@@ -24,6 +24,7 @@ package trafficcontrol
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/telekom/aml-jens/internal/assets"
 	"github.com/telekom/aml-jens/internal/commands"
@@ -223,6 +224,7 @@ func (tc *TrafficControl) LaunchChangeLoop(waitTime time.Duration, drp *datatype
 				}
 			}
 			//change data rate in control file
+			value = math.Max(value, drp.Intial_minRateKbits)
 			if err := tc.ChangeTo(value); err != nil {
 				r.ReportFatal(fmt.Errorf("LaunchChangeLoop could not change Value: %w", err))
 				r.Wg.Done()

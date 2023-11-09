@@ -105,51 +105,11 @@ func TestNewDrpFileListFolderScale0Min0(t *testing.T) {
 	}
 }
 
-func TestNewDrpFileListUniqueModifiedScaleMin(t *testing.T) {
-	providers := []DataRatePatternProvider{
-		NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), "saw.csv")),
-		NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), "saw.csv")),
-		NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), "saw.csv")),
-		NewDataRatePatternFileProvider(filepath.Join(paths.TESTDATA_DRP(), "saw.csv")),
-	}
-	args := []struct {
-		scale     float64
-		minrateKb float64
-	}{
-		{scale: 0, minrateKb: 0},
-		{},
-		{scale: 1, minrateKb: 1},
-		{scale: 2, minrateKb: 20001},
-	}
-	args_int := [][3]float64{
-		{0, 0},
-		{0, 0},
-		{1, 1},
-		{2, 20001},
-	}
-	list, err := NewDrpList(providers, args, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if list.Selected != 0 {
-		t.Fatal("0 should be selected")
-	}
-	for i, v := range list.Drps {
-		compareDrps(createExpectation(ExpectationSaw, args_int[i][0], args_int[i][1]), *v.data, t)
-	}
-}
-
-func TestNewDrpFileListSingleScale0_5Min5001(t *testing.T) {
-	HelperTestNewDrpFileListSingleScaleXMinY(0.5, 5001, t)
-}
 func TestNewDrpFileListSingleScale1Min5001(t *testing.T) {
 	HelperTestNewDrpFileListSingleScaleXMinY(1, 5001, t)
 }
 func TestNewDrpFileListSingleScale2Min5001(t *testing.T) {
 	HelperTestNewDrpFileListSingleScaleXMinY(2, 5001, t)
-}
-func TestNewDrpFileListSingleScale0Min10001(t *testing.T) {
-	HelperTestNewDrpFileListSingleScaleXMinY(0, 10001, t)
 }
 func TestNewDrpFileListSingleScale1Min1(t *testing.T) {
 	HelperTestNewDrpFileListSingleScaleXMinY(1, 1, t)

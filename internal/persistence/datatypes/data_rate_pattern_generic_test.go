@@ -56,34 +56,6 @@ func TestDrpNaming(t *testing.T) {
 	}
 }
 
-func TestDrpMinrateAndLen(t *testing.T) {
-	db_drp := datatypes.DB_data_rate_pattern{
-		Initial_scale:       1,
-		Intial_minRateKbits: 20400,
-	}
-	err := db_drp.ParseDRP(drp.NewDataRatePatternFileProvider(GOOD_PATH))
-	if err != nil {
-		t.Fatalf("Loaded valid drp, got an error: %s", err)
-	}
-	counter := 0
-	for {
-		rate, err := db_drp.Next()
-		if err != nil {
-			if _, ok := err.(*errortypes.IterableStopError); !ok {
-				t.Fatal(err)
-			}
-			if expected := 3000; counter != expected {
-				t.Fatalf("Length of loaded pattern is incorrect (%d != %d)", counter, expected)
-			}
-			return
-		}
-		if rate < 20400 {
-			t.Fatalf("Encountered Rate less than set MinimumBitRate: %f", rate)
-		}
-		counter++
-	}
-}
-
 func TestDrpHash(t *testing.T) {
 	db_drp := datatypes.DB_data_rate_pattern{
 		Initial_scale:       1,
@@ -96,39 +68,6 @@ func TestDrpHash(t *testing.T) {
 	if db_drp.GetHashStr() != "acd87822fa43d98efc9b854884336ff3" {
 		t.Fatalf("Hash is incorrect. Is: '%s', should be %s", db_drp.GetHashStr(), "acd87822fa43d98efc9b854884336ff3")
 	}
-}
-
-func TestDrpHashWithChangesToScaleMinLoop(t *testing.T) {
-	db_drps := []datatypes.DB_data_rate_pattern{
-		{
-			Initial_scale:       1,
-			Intial_minRateKbits: 20400,
-		},
-		{
-			Initial_scale:       2,
-			Intial_minRateKbits: 20400,
-		},
-		{
-			Initial_scale:       1,
-			Intial_minRateKbits: 50400,
-		},
-		{
-			Initial_scale:       3,
-			Intial_minRateKbits: 120400,
-		},
-	}
-	for i, v := range db_drps {
-		err := v.ParseDRP(drp.NewDataRatePatternFileProvider(SAW_PATH))
-		if err != nil {
-			t.Fatalf("Loaded valid drp, got an error: %s", err)
-		}
-		t.Log(i)
-		t.Log(v.GetStats())
-		if v.GetHashStr() != "acd87822fa43d98efc9b854884336ff3" {
-			t.Fatalf("Hash is incorrect. Is: '%s', should be %s", v.GetHashStr(), "acd87822fa43d98efc9b854884336ff3")
-		}
-	}
-
 }
 
 func TestBroken(t *testing.T) {
