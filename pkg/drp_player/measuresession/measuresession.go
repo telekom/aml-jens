@@ -276,7 +276,7 @@ func (m *MeasureSession) poll(r util.RoutineReport) {
 		case RECORD_TYPE_Q: // QueueMeasure MQ
 			numberOfPacketsInQueue := uint16(binary.LittleEndian.Uint16(recordArray[10:12]))
 			memUsageBytes := uint32(binary.LittleEndian.Uint32(recordArray[12:16]))
-			currentCapacityKbits = uint64(binary.LittleEndian.Uint64(recordArray[16:24])) / 1000
+			currentCapacityKbits = uint64(m.session.ChildDRP.Peek())
 			currentEpochMs := timestampMs + m.time_diff
 			queueMeasure := DB_measure_queue{
 				Time:              currentEpochMs,
