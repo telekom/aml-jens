@@ -59,7 +59,7 @@ type AggregateMeasure struct {
 	sampleCount             uint32
 	sumSojournTimeRealMs    uint32
 	sumSojournTimeVirtualMs uint32
-	sumloadBytes            uint32
+	sumloadBytes            uint64
 	sumCapacityKbits        int64
 	sumEcnNCE               uint32
 	sumDropped              uint32
@@ -71,23 +71,23 @@ type AggregateMeasure struct {
 var currentCapacityKbits uint64
 
 func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
-	var sampleCapacityKbits uint32
+	var sampleCapacityKbits uint64
 	sample_duration := util.MaxInt(SAMPLE_DURATION_MS, int(s.t_end-s.t_start))
-	loadKbits := ((s.sumloadBytes * 8) / 1000) * (1000 / uint32(sample_duration))
+	loadKbits := (s.sumloadBytes * 8) / uint64(sample_duration)
 	if s.sumCapacityKbits == -1 {
 		sampleCapacityKbits = loadKbits
 	} else {
-		sampleCapacityKbits = uint32(s.sumCapacityKbits) / s.sampleCount
+		sampleCapacityKbits = uint64(s.sumCapacityKbits) / uint64(s.sampleCount)
 	}
 	return DB_measure_packet{
 		Time:                       time,
 		PacketSojournTimeRealMs:    s.sumSojournTimeRealMs / s.sampleCount,
 		PacketSojournTimeVirtualMs: s.sumSojournTimeVirtualMs / s.sampleCount,
-		LoadKbits:                  loadKbits,
+		LoadKbits:                  uint32(loadKbits),
 		Ecn:                        uint32((float32(s.sumEcnNCE) / float32(s.sampleCount)) * 100),
 		Dropped:                    s.sumDropped,
 		Fk_flow_id:                 s.net_flow.Flow_id,
-		Capacitykbits:              sampleCapacityKbits,
+		Capacitykbits:              uint32(sampleCapacityKbits),
 		Net_flow_string:            s.net_flow.MeasureIdStr(),
 		Net_flow_prio:              s.net_flow.Prio,
 	}
@@ -109,7 +109,11 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 
 func (s *AggregateMeasure) add(pm *PacketMeasure) {
 	if s.t_start == 0 {
-		s.t_start = pm.timestampMs
+		// start of the sample intervall is end of the previous one
+		s.t_start = s.t_end
+		if s.t_end == 0 {
+			s.t_start = pm.timestampMs
+		}
 	}
 	s.t_end = pm.timestampMs
 	if pm.drop {
@@ -120,7 +124,7 @@ func (s *AggregateMeasure) add(pm *PacketMeasure) {
 	// aggregate sample values
 	s.sumSojournTimeRealMs += pm.sojournTimeRealMs
 	s.sumSojournTimeVirtualMs += pm.sojournTimeVirtualMs
-	s.sumloadBytes += pm.packetSizeByte
+	s.sumloadBytes += uint64(pm.packetSizeByte)
 	s.sumCapacityKbits += int64(pm.currentCapacityKbits)
 
 	if pm.ecnOut == 3 {
