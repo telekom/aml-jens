@@ -93,7 +93,7 @@ func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 	}
 }
 
-func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
+func NewAggregateMeasure(flow *datatypes.DB_network_flow, startTime uint64) *AggregateMeasure {
 	return &AggregateMeasure{
 		sumloadBytes:            0,
 		sumDropped:              0,
@@ -102,20 +102,11 @@ func NewAggregateMeasure(flow *datatypes.DB_network_flow) *AggregateMeasure {
 		sumSojournTimeVirtualMs: 0,
 		sampleCount:             0,
 		net_flow:                flow,
-		t_start:                 0,
-		t_end:                   0,
+		t_start:                 startTime,
 	}
 }
 
 func (s *AggregateMeasure) add(pm *PacketMeasure) {
-	if s.t_start == 0 {
-		// start of the sample intervall is end of the previous one
-		s.t_start = s.t_end
-		if s.t_end == 0 {
-			s.t_start = pm.timestampMs
-		}
-	}
-	s.t_end = pm.timestampMs
 	if pm.drop {
 		s.sumDropped++
 		//DEBUG.Printf("D: %+v", pm)
@@ -131,6 +122,17 @@ func (s *AggregateMeasure) add(pm *PacketMeasure) {
 		s.sumEcnNCE++
 	}
 	s.sampleCount++
+}
+
+func (s *AggregateMeasure) reset() {
+	s.sumloadBytes = 0
+	s.sumDropped = 0
+	s.sumEcnNCE = 0
+	s.sumCapacityKbits = 0
+	s.sumSojournTimeRealMs = 0
+	s.sumSojournTimeVirtualMs = 0
+	s.sampleCount = 0
+	s.t_start = s.t_end
 }
 
 type DbQueueMeasure struct {
@@ -338,12 +340,12 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 				}
 				measure, keyExists := mapMeasures[message.net_flow.MeasureIdStr()]
 				if !keyExists {
-					measure = NewAggregateMeasure(message.net_flow)
+					measure = NewAggregateMeasure(message.net_flow, message.timestampMs)
 					mapMeasures[message.net_flow.MeasureIdStr()] = measure
 				}
 
 				measure.add(&message)
-
+				measure.t_end = message.timestampMs
 			default:
 				readMessages = false
 			}
@@ -372,6 +374,8 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 				}
 			}
 			m.chan_to_persistence <- sample
+			// reset sum values
+			aggregated_measure.reset()
 		}
 	}
 }
