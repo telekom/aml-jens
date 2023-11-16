@@ -24,7 +24,7 @@
 
 [drp]
   # MinimumDataRate for patterns
-  minRateKbits = 500
+  minRateKbits = 2000
   #Phase in MS before Networkshaping /DRP takes effect
   WarmupBeforeDrpMs = 2000
 
