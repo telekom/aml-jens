@@ -40,7 +40,7 @@ import (
 
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
-const CTRL_FILE = "/sys/kernel/debug/sch_jensvq2proto/0001:v1"
+const CTRL_FILE = "/sys/kernel/debug/sch_jensvq3proto/0001:v1"
 
 type TrafficControlStartParams struct {
 	Datarate     uint32
@@ -132,7 +132,7 @@ func (tc *TrafficControl) Init(params TrafficControlStartParams, nft NftStartPar
 	if err := tc.Reset(); true {
 		DEBUG.Printf("TcReset: %v", err)
 	}
-	args := []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "jensvq2proto"}
+	args := []string{"qdisc", "add", "dev", tc.dev, "root", "handle", "1:", "jensvq3proto"}
 
 	args = append(args, params.asArgs()...)
 	time.Sleep(1 * time.Second)

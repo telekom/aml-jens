@@ -141,7 +141,7 @@ type DbQueueMeasure struct {
 	memUsageBytes          uint32
 }
 
-const MM_FILE = "/sys/kernel/debug/sch_jensvq2proto/0001:0"
+const MM_FILE = "/sys/kernel/debug/sch_jensvq3proto/0001:0"
 
 const SAMPLE_DURATION_MS = 10
 
