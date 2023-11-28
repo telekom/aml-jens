@@ -38,65 +38,82 @@ import (
 var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type DataBase struct {
-	db                     *sql.DB
-	txMpMutex              sync.Mutex
-	txMP                   *sql.Tx
-	stmt_packet            *sql.Stmt
-	txMQ                   *sql.Tx
-	txMqMutex              sync.Mutex
-	stmt_queue             *sql.Stmt
-	stmt_sessionstats      *sql.Stmt
-	knownFlowsByMeasure_ID map[string]*datatypes.DB_network_flow
+	Db                *sql.DB
+	txMpMutex         sync.Mutex
+	txMP              *sql.Tx
+	stmt_packet       *sql.Stmt
+	txMQ              *sql.Tx
+	txMqMutex         sync.Mutex
+	stmt_queue        *sql.Stmt
+	stmt_sessionstats *sql.Stmt
 }
 
-func (s *DataBase) ClearCache() {
-	s.knownFlowsByMeasure_ID = make(map[string]*datatypes.DB_network_flow)
-}
 func (s *DataBase) GetStmt() datatypes.SQLStmt {
-	return s.db
+	return s.Db
 }
 
 //go:inline
 func (s *DataBase) HasDBConnection() bool {
-	return s.db != nil
+	return s.Db != nil
 }
 func (s *DataBase) Close() error {
 	DEBUG.Println("Closing DB")
 	if !s.HasDBConnection() {
-		return s.db.Close()
+		return s.Db.Close()
 	}
 	return nil
 }
 func (s *DataBase) Init(login *datatypes.Login) error {
-	s.knownFlowsByMeasure_ID = make(map[string]*datatypes.DB_network_flow)
 	if login != nil {
-		db, err := sql.Open("postgres", login.InfoStr())
-		if err != nil {
-			return fmt.Errorf("could not establish connection to DB: %s", err)
-		}
-		err = db.Ping()
-		if err != nil {
+		if s.Db == nil {
+			db, err := sql.Open("postgres", login.InfoStr())
+			if err != nil {
+				return fmt.Errorf("could not establish connection to DB: %s", err)
+			}
+			err = db.Ping()
+			if err != nil {
+				return err
+			}
+			db.SetMaxOpenConns(80)
+			s.Db = db
+			if err != nil {
+				return err
+			}
 			return err
 		}
-		s.db = db
-		if err != nil {
-			return err
-		}
+	}
+	return nil
+}
+
+func (s *DataBase) GetNewInstance() (*persistence.Persistence, error) {
+	db := &DataBase{}
+	db.Db = (*s).Db
+	error := db.initTransactions()
+	var persistence persistence.Persistence = db
+	return &persistence, error
+}
+
+func (s *DataBase) initTransactions() error {
+	var err error
+	if s.Db != nil {
 		if err = s.prep_bulk_stmts(); err != nil {
 			return err
 		}
 		err = s.prep_special_stmts()
 		return err
+	} else {
+		return fmt.Errorf("could not create transactions and prepared statements: %s", err)
 	}
 	return nil
 }
 
 func (s *DataBase) prep_bulk_stmts() (err error) {
-	s.txMQ, err = s.db.Begin()
+	INFO.Printf("%+v\n", s.Db.Stats())
+	s.txMQ, err = s.Db.Begin()
 	if err != nil {
 		return err
 	}
-	s.txMP, err = s.db.Begin()
+	s.txMP, err = s.Db.Begin()
 	if err != nil {
 		return err
 	}
@@ -109,7 +126,7 @@ func (s *DataBase) prep_bulk_stmts() (err error) {
 }
 
 func (s *DataBase) prep_special_stmts() (err error) {
-	s.stmt_sessionstats, err = s.db.Prepare(`
+	s.stmt_sessionstats, err = s.Db.Prepare(`
 		select COALESCE(MAX(loadkbits),-1) as load, COALESCE(MIN(time),0) as start, COALESCE(MAX(TIME),1) as end from measure_packet
 		where fk_flow_id IN (SELECT flow_id from network_flow where session_id=$1) LIMIT 1;
 		`)
@@ -126,23 +143,12 @@ func (s *DataBase) GetSessionStats(session_id int) (int, int, int, error) {
 
 // var flow_id_cache map[string]
 func (s *DataBase) persist_flow(flow *datatypes.DB_network_flow) error {
-	flowInCache, keyExists := s.knownFlowsByMeasure_ID[flow.MeasureIdStr()]
-	if keyExists {
-		if flow.Prio != flowInCache.Prio {
-			flow.Update(s.db, flowInCache.Flow_id, flow.Prio)
-			flowInCache.Prio = flow.Prio
-		}
-		flow.Flow_id = flowInCache.Flow_id
-		return nil
-	} else {
-		err := flow.Sync(s.db)
-		s.knownFlowsByMeasure_ID[flow.MeasureIdStr()] = flow
-		return err
-	}
+	err := flow.Sync(s.Db)
+	return err
 }
 func (s *DataBase) Persist(obj interface{}) error {
 	if !s.HasDBConnection() {
-		return errors.New("no connection to db")
+		return errors.New("no connection to Db")
 	}
 	switch v := obj.(type) {
 	case datatypes.DB_measure_packet:
@@ -154,10 +160,12 @@ func (s *DataBase) Persist(obj interface{}) error {
 			return fmt.Errorf("Persist(datatypes.DB_network_flow)%v", err)
 		}
 		return nil
+	case *datatypes.DB_data_rate_pattern:
+		return v.Sync(s.Db)
 	case persistence.DumbPersistable:
-		//Catch for benchmark, data_rate_pattern
+		//Catch for benchmark
 		DEBUG.Printf("{interface {persistence.DumbPersistable}} --> %v", reflect.TypeOf(v))
-		return v.Insert(s.db)
+		return v.Insert(s.Db)
 	default:
 		WARN.Printf("unknown Obj-Type: %v (%+v)", reflect.TypeOf(obj), obj)
 		return nil
@@ -170,7 +178,7 @@ func (s *DataBase) Persist(obj interface{}) error {
 func (s *DataBase) persist_measure_packet(data datatypes.DB_measure_packet) error {
 
 	if data.Fk_flow_id == -1 {
-		return errors.New("trying to persist a meausre_packet without its Fk_flow_id set.")
+		return errors.New("trying to persist a meausre_packet without its Fk_flow_id set")
 	}
 	if data.Capacitykbits == 0 {
 		//Do not persist samples where capacity is 0
@@ -198,49 +206,44 @@ func (s *DataBase) persist_measurequeue(data datatypes.DB_measure_queue) error {
 //
 //go:inline
 func (s *DataBase) Commit() {
-	go func(self *DataBase) {
-		var err error
-		self.txMqMutex.Lock()
-		//DEBUG.Println("Committing txMQ")
-		if err := self.txMQ.Commit(); err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
-		}
-		self.txMQ, err = self.db.Begin()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not create transaction of measure_queue: check logs / db")
-		}
-		self.stmt_queue, err = self.txMQ.Prepare(datatypes.DB_measure_queue{}.GetSQLStatement())
-		self.txMqMutex.Unlock()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not prepare preparedstatments of measure_queue: check logs / db")
-		}
-	}(s)
-	go func(self *DataBase) {
-		var err error
-		self.txMpMutex.Lock()
-		//DEBUG.Println("Committing txMP")
-		if err := self.txMP.Commit(); err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not commit transaction of measure_queue: check logs / db")
-		}
-		self.txMP, err = self.db.Begin()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not create transaction of measure_packet: check logs / db")
-		}
-		self.stmt_packet, err = self.txMP.Prepare(datatypes.DB_measure_packet{}.GetSQLStatement())
-		self.txMpMutex.Unlock()
-		if err != nil {
-			FATAL.Println(err)
-			FATAL.Exit("Could not prepare preparedstatments of measure_packet: check logs / db")
-		}
-	}(s)
+	var err error
+	s.txMqMutex.Lock()
+	//DEBUG.Println("Committing txMQ")
+	if err := s.txMQ.Commit(); err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not commit transaction of measure_queue: check logs / Db")
+	}
+	s.txMQ, err = s.Db.Begin()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not create transaction of measure_queue: check logs / Db")
+	}
+	s.stmt_queue, err = s.txMQ.Prepare(datatypes.DB_measure_queue{}.GetSQLStatement())
+	s.txMqMutex.Unlock()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not prepare preparedstatments of measure_queue: check logs / Db")
+	}
+	s.txMpMutex.Lock()
+	//DEBUG.Println("Committing txMP")
+	if err := s.txMP.Commit(); err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not commit transaction of measure_queue: check logs / Db")
+	}
+	s.txMP, err = s.Db.Begin()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not create transaction of measure_packet: check logs / Db")
+	}
+	s.stmt_packet, err = s.txMP.Prepare(datatypes.DB_measure_packet{}.GetSQLStatement())
+	s.txMpMutex.Unlock()
+	if err != nil {
+		FATAL.Println(err)
+		FATAL.Exit("Could not prepare preparedstatments of measure_packet: check logs / Db")
+	}
 }
 
 //go:inline
 func (s *DataBase) ValidateUniqueName(obj persistence.PersistbleWithUniqueName) error {
-	return obj.ValidateUniqueName(s.db)
+	return obj.ValidateUniqueName(s.Db)
 }

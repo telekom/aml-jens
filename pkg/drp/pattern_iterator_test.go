@@ -37,7 +37,6 @@ func TestIterator_saw(t *testing.T) {
 	iter := drp.Iterator()
 	pos := 0
 	for v, err := iter.Next(); err == nil; v, err = iter.Next() {
-		t.Log(pos, v)
 		if ExpectationSaw[pos] != v {
 			t.Fatalf("Got unexpected value '%f' @ %d, (!= %f)", v, pos, ExpectationSaw[pos])
 		}
@@ -63,7 +62,6 @@ func TestIteratorValue_saw(t *testing.T) {
 	pos := 0
 	for v, err := iter.Next(); err == nil; v, err = iter.Next() {
 		v_got := iter.Value()
-		t.Log(v_got)
 		if v_got != v {
 			t.Fatalf("Got unexpected Value():'%f'!= %f)", iter.Value(), v)
 		}

@@ -30,12 +30,13 @@ type DB_network_flow struct {
 	//Serial - from DB
 	Flow_id int
 	//Fk, refrences DB_session
-	Session_id       int
-	Source_ip        string
-	Source_port      uint16
-	Destination_ip   string
-	Destination_port uint16
-	Prio             uint8
+	TransportProtocoll string
+	Session_id         int
+	Source_ip          string
+	Source_port        uint16
+	Destination_ip     string
+	Destination_port   uint16
+	Prio               uint8
 	//Used for caching
 	measure_id_str string
 }
@@ -49,15 +50,17 @@ func (s *DB_network_flow) Insert(stmt SQLStmt) error {
 		source_port,
 		destination_ip,
 		destination_port,
+	 	transport_protocoll,
 	 	prio
 	)
-	VALUES ( $1, $2, $3, $4, $5, $6)
+	VALUES ( $1, $2, $3, $4, $5, $6, $7)
 	RETURNING flow_id;`,
 		s.Session_id,
 		s.Source_ip,
 		s.Source_port,
 		s.Destination_ip,
 		s.Destination_port,
+		s.TransportProtocoll,
 		s.Prio,
 	).Scan(&s.Flow_id)
 }

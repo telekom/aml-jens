@@ -44,18 +44,27 @@ type DB_session struct {
 	Nomeasure           bool
 	//Non DB
 	SignalDrpStart bool
+	Uenum          uint8
+	NetflowFilter  string
+
 	// DB_Relations
-	ParentBenchmark *DB_benchmark
-	ChildDRP        *DB_data_rate_pattern
+	ParentBenchmark    *DB_benchmark
+	ParentMultisession *DB_multi_session
+
+	ChildDRP *DB_data_rate_pattern
 }
 
 // Executes a sqlstmt to Insert this session into DB
 func (s *DB_session) Insert(stmt SQLStmt) error {
-	err := s.ChildDRP.Insert(stmt)
+	err := s.ChildDRP.Sync(stmt)
 	if err != nil {
 		return err
 	}
 
+	var multisessionId int
+	if s.ParentMultisession != nil {
+		multisessionId = s.ParentMultisession.Multisession_id
+	}
 	err = stmt.QueryRow(`INSERT INTO session_tag (
 	benchmark_id,
 	name,
@@ -66,8 +75,11 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 	markfull,
 	extralatency,
 	qosmode,
-	l4sEnablePreMarking
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING session_id`,
+	l4sEnablePreMarking,
+	uenum,
+	netflow_filter,                         
+    multisession_id
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING session_id`,
 		s.getBenchmarkId(),
 		s.Name,
 		s.Time,
@@ -77,7 +89,10 @@ func (s *DB_session) Insert(stmt SQLStmt) error {
 		s.Markfull,
 		s.ExtralatencyMs,
 		s.Qosmode,
-		s.L4sEnablePreMarking).Scan(&s.Session_id)
+		s.L4sEnablePreMarking,
+		s.Uenum,
+		s.NetflowFilter,
+		multisessionId).Scan(&s.Session_id)
 	return err
 }
 

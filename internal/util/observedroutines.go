@@ -14,8 +14,8 @@ const (
 )
 
 type RoutineReport struct {
-	Wg               *sync.WaitGroup
-	On_extern_exit_c chan uint8
+	Wg              *sync.WaitGroup
+	Exit_now_signal chan uint8
 	//This channel should be used, in the event of a fatal-ish error
 	Send_error_c chan struct {
 		Err   error
@@ -23,10 +23,11 @@ type RoutineReport struct {
 	}
 	//This channel should be used, if and only if some goroutine markes the application as finished
 	Application_has_finished chan string
-	exits                    []chan interface{}
 }
 
 func (r RoutineReport) Report(err error, level ErrorLevel) {
+	WARN.Printf("[%d]%+v\n", level, err)
+
 	select {
 	case r.Send_error_c <- struct {
 		Err   error

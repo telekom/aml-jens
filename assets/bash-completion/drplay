@@ -20,7 +20,7 @@ _drplay()
     local IFS=$'\t\n'
     _init_completion -n = || return
 
-    opts="-dev$IFS-pattern$IFS-freq$IFS-csv$IFS-psql$IFS-loop$IFS-tag$IFS-scale$IFS-nomeasure"
+    opts="-dev$IFS-pattern$IFS-freq$IFS-csv$IFS-psql$IFS-loop$IFS-tag$IFS-scale$IFS-bandwidth$IFS-nomeasure"
     # Remove already used opts
     blacklist=()
     options=($opts)
@@ -54,7 +54,7 @@ _drplay()
         opts=("${opts[@]/$item}")
     done
 
-    # Show context senitive opts
+    # Show context sensitive opts
     case $prev in
     -dev)
 	    _dr_lsinterfaces -a

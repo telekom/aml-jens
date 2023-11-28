@@ -15,6 +15,25 @@
   # Mark the first packets with special ect
   signalDrpStart=false
 
+[drplay]
+  # Total number of network queues for drplay
+  # value 1 : All traffic in uplink direction of the specified network interface is handled in one queue
+  # value > 1 : Explicte netflows can be defined below to identify specific UE traffic, which should be handled in a sperate queue.
+  #             If a netflow (src-ip:port->dest-ip:port) is not filtered by the netflows rules, it is routed through
+  #             the common default queue UE0. But it is assigned to a seperate queue automatically, as long as its load exceeds ueminloadkbits.
+  uenum=16
+  # Define a netflow for each UE in your test setup you want to handle in a separate network quueue, the syntax of the filter is in nft syntax.
+  # By this, corresponding nft rules are defined. If your application uses custom traffic filter/marking rules (iptables or nft),
+  # check for possible interference.
+  netflows= [
+                    "ip saddr 192.168.2.0/24 udp sport 22 ip daddr 192.168.0.1 udp dport 22", # UE1
+                    "ip daddr 192.168.178.75", # UE2
+                    "ip daddr 192.168.178.9" # UE3
+            ]
+  ueminloadkbits=1000
+  # true: the available capacity (from data rate pattern or bandwidth) is divided by the number of UEs/active Queues
+  # false: use capacity (from data rate pattern or bandwidth) as specified for each UE
+  sharecapacityresources=true
 [postgres]
   dbname = "l4s_measure"
   host = "localhost"

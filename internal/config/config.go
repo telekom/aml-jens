@@ -58,6 +58,23 @@ func (c *config) readFromFile() error {
 	drp.WarmupTimeMs = viper.GetInt32("drp.WarmupBeforeDrpMs")
 	drp.Freq = -1
 	drp.Initial_scale = -1
+	multisession := datatypes.DB_multi_session{
+		UenumTotal:             uint8(viper.GetInt("drplay.uenum")),
+		FixedNetflows:          viper.GetStringSlice("drplay.netflows"),
+		UeMinloadkbits:         uint32(viper.GetInt("drplay.ueminloadkbits")),
+		DrpMode:                true,
+		ShareCapacityResources: viper.GetBool("drplay.sharecapacityresources"),
+	}
+	// strip unused netflow specs
+	numberOfNetflows := len(multisession.FixedNetflows)
+	if uint8(numberOfNetflows) > multisession.UenumTotal {
+		multisession.FixedNetflows = multisession.FixedNetflows[:numberOfNetflows-1]
+	}
+	// min number of UEs is 2
+	multisession.SingleQueue = false
+	if multisession.UenumTotal == 1 {
+		multisession.SingleQueue = true
+	}
 	asd := datatypes.DB_session{
 		//TC
 		Markfree:            viper.GetInt32("tccommands.markfree"),
@@ -74,7 +91,8 @@ func (c *config) readFromFile() error {
 		},
 	}
 	c.player = &DrPlayConfig{
-		A_Session: &asd,
+		A_MultiSession: &multisession,
+		A_Session:      &asd,
 		Psql: datatypes.Login{
 			Dbname:   viper.GetString("postgres.dbname"),
 			Host:     viper.GetString("postgres.host"),
@@ -132,11 +150,13 @@ func (c *config) setToDefaults() {
 		Qosmode:             0,
 		L4sEnablePreMarking: false,
 		SignalDrpStart:      false,
+		Uenum:               8,
 		//DRP
 		ChildDRP: drp,
 		ParentBenchmark: &datatypes.DB_benchmark{
 			PrintToStdOut: true,
 		},
+		ParentMultisession: &datatypes.DB_multi_session{},
 	}
 	c.player = &DrPlayConfig{
 		A_Session: &asd,
@@ -147,7 +167,8 @@ func (c *config) setToDefaults() {
 			Port:     0,
 			User:     "default",
 		},
-		PrintToStdOut: true,
+		PrintToStdOut:  true,
+		A_MultiSession: asd.ParentMultisession,
 	}
 	var scaleMode ConfigFlowPlotScrollMode = Scrolling
 	scaleMode = Scaling

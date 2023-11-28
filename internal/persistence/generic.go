@@ -33,6 +33,7 @@ var DEBUG, INFO, WARN, FATAL = logging.GetLogger()
 
 type Persistence interface {
 	Init(login *datatypes.Login) error
+	GetNewInstance() (*Persistence, error)
 	Close() error
 	GetSessionStats(session_id int) (load int, start int, end int, err error)
 	Persist(obj interface{}) error
@@ -40,7 +41,6 @@ type Persistence interface {
 	HasDBConnection() bool
 	GetStmt() datatypes.SQLStmt
 	ValidateUniqueName(obj PersistbleWithUniqueName) error
-	ClearCache()
 }
 type PersistbleWithUniqueName interface {
 	ValidateUniqueName(stmt datatypes.SQLStmt) error
@@ -71,10 +71,6 @@ func GetPersistence() (*Persistence, error) {
 // Initially sets the singelton_instance of persistence to v with login
 // Subsequent calls have no effect
 func SetPersistenceTo(v Persistence, login *datatypes.Login) error {
-	if persistence_store != nil {
-		WARN.Printf("NOT re-setting persistence from %v to %v\n", persistence_store, v)
-		return nil
-	}
 	DEBUG.Printf("Using %v as Persistence", reflect.TypeOf(v))
 	persistence_store = v
 	return persistence_store.Init(login)
