@@ -26,6 +26,7 @@ package measuresession
  #include "stdlib.h"
  #include "poll.h"
  #include <time.h>
+
  static unsigned long long get_nsecs(void)
  {
 	 struct timespec ts;
@@ -69,6 +70,8 @@ type AggregateMeasure struct {
 }
 
 var currentCapacityKbits uint64
+var debugRawFile *os.File
+var debugRecordCount int = 0
 
 func (s *AggregateMeasure) toDB_measure_packet(time uint64) DB_measure_packet {
 	var sampleCapacityKbits uint64
@@ -122,17 +125,6 @@ func (s *AggregateMeasure) add(pm *PacketMeasure) {
 		s.sumEcnNCE++
 	}
 	s.sampleCount++
-}
-
-func (s *AggregateMeasure) reset() {
-	s.sumloadBytes = 0
-	s.sumDropped = 0
-	s.sumEcnNCE = 0
-	s.sumCapacityKbits = 0
-	s.sumSojournTimeRealMs = 0
-	s.sumSojournTimeVirtualMs = 0
-	s.sampleCount = 0
-	s.t_start = s.t_end
 }
 
 type DbQueueMeasure struct {
@@ -219,6 +211,11 @@ func (m MeasureSession) Start(r util.RoutineReport) {
 // Will close if membervariable m.shouldEnd becomes true
 // Will foreward this signal by closing chan_to_aggregation
 func (m *MeasureSession) poll(r util.RoutineReport) {
+	//binary output file for debug
+	if m.session.ChildDRP.RawMeasureDump {
+		debugRawFile, _ = os.Create("measures.bin")
+		defer debugRawFile.Close()
+	}
 	//Buffer in which the contets of MM_FILE will be written
 	recordArray := make(RecordArray, RECORD_SIZE)
 	var file, err = os.Open(MM_FILE)
@@ -258,6 +255,18 @@ func (m *MeasureSession) poll(r util.RoutineReport) {
 			r.ReportInfo(fmt.Errorf("bytesRead != 64 while reading recordArray"))
 			continue
 		}
+
+		if m.session.ChildDRP.RawMeasureDump {
+			_, err = debugRawFile.Write(recordArray)
+			if err != nil {
+				FATAL.Printf("could not write raw measures to output file\n")
+			}
+			debugRecordCount++
+			if debugRecordCount%1000 == 0 {
+				debugRawFile.Sync()
+			}
+		}
+
 		timestampMs := uint64(binary.LittleEndian.Uint64(recordArray[0:8])) / 1e6
 		switch recordArray.type_id() {
 		case RECORD_TYPE_P: // PacketMeasure MP
@@ -374,8 +383,6 @@ func (m MeasureSession) aggregateMeasures(r util.RoutineReport) {
 				}
 			}
 			m.chan_to_persistence <- sample
-			// reset sum values
-			aggregated_measure.reset()
 		}
 	}
 }

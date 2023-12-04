@@ -98,7 +98,14 @@ func ArgParse() (err error) {
 		false,
 		"only play drp, no queue measures are recorded")
 
+	flag.BoolVar(
+		&result.ChildDRP.RawMeasureDump,
+		"rawmeasuredump",
+		false,
+		"save binary queue measures additionally to file 'measures.bin'")
+
 	flag.Parse()
+
 	if *version {
 		fmt.Printf("Version      : %s\n", assets.VERSION)
 		fmt.Printf("Compiletime  : %s\n", assets.BUILD_TIME)

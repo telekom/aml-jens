@@ -38,8 +38,9 @@ type DB_data_rate_pattern struct {
 	Freq      int
 	Nomeasure bool
 	//Non db-realted
-	dr_pattern   drp.DataRatePattern
-	WarmupTimeMs int32
+	dr_pattern     drp.DataRatePattern
+	WarmupTimeMs   int32
+	RawMeasureDump bool
 
 	Intial_minRateKbits float64
 	Initial_scale       float64
