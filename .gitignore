@@ -32,3 +32,5 @@ go.work
 # Generated debian packages
 *.deb
 deployments/_build/*
+comparison_sessions/**/*
+XX_BenchmarkOfbenchmarks*/
